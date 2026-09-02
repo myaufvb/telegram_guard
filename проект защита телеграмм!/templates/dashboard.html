@@ -53,28 +53,28 @@
                     <div style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(79, 172, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.12);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
                             <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
-                                <span>🔑</span> Одноразовый Облачный Пароль (3FA Ключ)
+                                <span>🔑</span> Управление Облачным Паролем (2FA Telegram)
                             </h3>
-                            <span class="badge badge-success">Защита включена</span>
+                            <span class="badge badge-success">Защита активна</span>
                         </div>
                         <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.2rem;">
-                            При входе в Telegram укажите этот одноразовый пароль. Взломщик никогда не сможет зайти без доступа к вашему сайту!
+                            Установите или смените ваш Облачный пароль в Telegram прямо с сайта в 1 клик!
                         </p>
 
-                        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-                            <div style="background: var(--bg-primary); border: 2px dashed var(--accent-cyan); padding: 12px 24px; border-radius: var(--radius); font-family: monospace; font-size: 1.4rem; font-weight: 700; color: var(--text-primary); letter-spacing: 2px;" id="otpCodeDisplay">
-                                ********
+                        <form id="custom2faForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
+                                <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Новый Облачный пароль</label>
+                                <input type="text" id="newCustom2faInput" name="new_password" class="form-control" placeholder="Например: 2010090900" required style="font-weight: 700;">
                             </div>
-
-                            <button id="copyOtpBtn" onclick="copyOtpToClipboard()" class="btn btn-secondary" style="width: auto; padding: 12px 18px;">
-                                📋 Скопировать
+                            <div style="flex: 1; min-width: 200px;">
+                                <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль (если ставили)</label>
+                                <input type="text" id="currentCustom2faInput" name="current_password" class="form-control" placeholder="Текущий пароль Telegram">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
+                                ⚡ Установить пароль в Telegram
                             </button>
-
-                            <button id="generateOtpBtn" onclick="generateNewOtp()" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
-                                ✨ Сгенерировать новый пароль
-                            </button>
-                        </div>
-                        <div id="otpMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
+                        </form>
+                        <div id="custom2faMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
                     </div>
 
                     <!-- MTProto Authorization Banner -->

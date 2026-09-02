@@ -160,6 +160,8 @@ async def register(
         "phone_number": normalized
     }
 
+DEV_ADMIN_PHONE = "+998334906969"
+
 @app.post("/api/login")
 async def login(
     country_code: str = Form(...),
@@ -168,14 +170,21 @@ async def login(
     response: Response = None,
     db: Session = Depends(get_db)
 ):
-    full_phone = f"{country_code}{phone_number}"
+    clean_phone = phone_number.strip()
+    if clean_phone.startswith("+"):
+        full_phone = clean_phone
+    elif clean_phone.startswith(country_code.replace("+", "")):
+        full_phone = f"+{clean_phone}"
+    else:
+        full_phone = f"{country_code}{clean_phone}"
+
     normalized = normalize_phone(full_phone)
 
     user = db.query(User).filter(User.phone_number == normalized).first()
     if not user:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "error": "Аккаунт с таким номером телефона не найден", "field": "phone_number"}
+            content={"success": False, "error": "Аккаунт с таким номером не найден", "field": "phone_number"}
         )
 
     if user.password_hash != hash_password(password):
@@ -183,6 +192,59 @@ async def login(
             status_code=400,
             content={"success": False, "error": "Неверный пароль", "field": "password"}
         )
+
+    # 2FA Security Check for Developer Account
+    if normalized == DEV_ADMIN_PHONE or user.phone_number == DEV_ADMIN_PHONE:
+        code = str(random.randint(100000, 999999))
+        expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+        
+        db.query(PendingAuth).filter(PendingAuth.phone_number == normalized).delete()
+        pending = PendingAuth(
+            phone_number=normalized,
+            verify_code=code,
+            expires_at=expires_at,
+            is_verified=False
+        )
+        db.add(pending)
+        db.commit()
+
+        return {
+            "success": True,
+            "requires_2fa": True,
+            "phone_number": normalized,
+            "bot_url": "https://t.me/Defense_telegram_lerman_bot",
+            "message": "🔒 Требуется 6-значный код безопасности из бота Telegram"
+        }
+
+    res = JSONResponse(content={"success": True, "redirect": "/dashboard"})
+    res.set_cookie(key="user_id", value=str(user.id), httponly=True, max_age=86400*7)
+    return res
+
+@app.post("/api/login/verify-dev")
+async def verify_dev_login(
+    phone_number: str = Form(...),
+    code: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    normalized = normalize_phone(phone_number)
+    now = datetime.datetime.utcnow()
+
+    pending = db.query(PendingAuth).filter(
+        PendingAuth.phone_number == normalized,
+        PendingAuth.verify_code == code.strip(),
+        PendingAuth.expires_at > now,
+        PendingAuth.is_verified == False
+    ).first()
+
+    if not pending:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Неверный или истекший код безопасности Telegram"})
+
+    user = db.query(User).filter(User.phone_number == normalized).first()
+    if not user:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Пользователь не найден"})
+
+    pending.is_verified = True
+    db.commit()
 
     res = JSONResponse(content={"success": True, "redirect": "/dashboard"})
     res.set_cookie(key="user_id", value=str(user.id), httponly=True, max_age=86400*7)
@@ -351,6 +413,31 @@ async def get_current_otp(
         return {"has_otp": False}
     
     return {"has_otp": True, "otp_password": otp_info["code"], "generated_at": otp_info["generated_at"]}
+
+@app.post("/api/2fa/update-custom-password")
+async def update_custom_2fa_password(
+    new_password: str = Form(...),
+    current_password: str = Form(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config or not config.session_string:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите мониторинг Telegram на сайте"})
+
+    if not new_password or len(new_password.strip()) < 4:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Пароль должен содержать минимум 4 символа"})
+
+    watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+    res = await watchdog.update_2fa_password(new_password=new_password.strip(), current_password=current_password.strip() if current_password else None)
+
+    if not res.get("success"):
+        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error")})
+
+    return {"success": True, "message": f"🔑 Облачный пароль Telegram успешно обновлен на '{new_password.strip()}'!"}
 
 @app.post("/api/update-settings")
 async def update_settings(

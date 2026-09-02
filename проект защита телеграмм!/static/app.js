@@ -70,7 +70,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await response.json();
 
                 if (result.success) {
-                    window.location.href = result.redirect || '/dashboard';
+                    if (result.requires_2fa) {
+                        // Show 2FA Developer verification modal
+                        document.getElementById('verifyPhoneHidden').value = result.phone_number;
+                        const modal = document.getElementById('verifyModal');
+                        if (modal) modal.classList.add('active');
+                    } else {
+                        window.location.href = result.redirect || '/dashboard';
+                    }
                 } else {
                     if (result.field) {
                         setFieldError(result.field, result.error);
@@ -358,18 +365,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.copyOtpToClipboard = function() {
-        const display = document.getElementById('otpCodeDisplay');
-        if (!display || display.textContent.includes('*')) return;
+    // Custom 2FA Password Form Handler
+    const custom2faForm = document.getElementById('custom2faForm');
+    if (custom2faForm) {
+        custom2faForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('custom2faMsg');
+            if (msg) {
+                msg.textContent = 'Обновление Облачного пароля в Telegram...';
+                msg.style.color = 'var(--text-secondary)';
+            }
 
-        navigator.clipboard.writeText(display.textContent.trim());
-        const msg = document.getElementById('otpMsg');
-        if (msg) {
-            msg.textContent = '📋 Пароль скопирован в буфер обмена!';
-            msg.style.color = 'var(--accent-cyan)';
-            setTimeout(() => { msg.textContent = ''; }, 3000);
-        }
-    };
+            const formData = new FormData(custom2faForm);
+            try {
+                const res = await fetch('/api/2fa/update-custom-password', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
 
-    window.loadCurrentOtp();
+                if (data.success) {
+                    if (msg) {
+                        msg.textContent = data.message || '✅ Облачный пароль успешно обновлен!';
+                        msg.style.color = 'var(--accent-green)';
+                    }
+                } else {
+                    if (msg) {
+                        msg.textContent = '❌ Ошибка: ' + (data.error || 'Не удалось обновить пароль');
+                        msg.style.color = 'var(--accent-red)';
+                    }
+                }
+            } catch (e) {
+                if (msg) {
+                    msg.textContent = 'Ошибка соединения с сервером';
+                    msg.style.color = 'var(--accent-red)';
+                }
+            }
+        });
+    }
 });
