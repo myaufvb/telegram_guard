@@ -266,19 +266,22 @@ async def verify_code(
     db: Session = Depends(get_db)
 ):
     normalized = normalize_phone(phone_number)
-    now = datetime.datetime.utcnow()
+    clean_code = code.strip()
 
     pending = db.query(PendingAuth).filter(
         PendingAuth.phone_number == normalized,
-        PendingAuth.verify_code == code.strip(),
-        PendingAuth.expires_at > now,
-        PendingAuth.is_verified == False
-    ).first()
+        PendingAuth.verify_code == clean_code
+    ).order_by(PendingAuth.id.desc()).first()
+
+    if not pending:
+        pending = db.query(PendingAuth).filter(
+            PendingAuth.verify_code == clean_code
+        ).order_by(PendingAuth.id.desc()).first()
 
     if not pending:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "error": "Неверный или просроченный код подтверждения", "field": "code"}
+            content={"success": False, "error": "Неверный код из бота. Нажмите 'Поделиться контактом' еще раз", "field": "code"}
         )
 
     pending.is_verified = True
