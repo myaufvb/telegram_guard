@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления — Telegram Guard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="brand">
+            <span class="brand-icon">🛡️</span>
+            <span>Telegram Guard Shield</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="color: var(--text-secondary); font-size: 0.9rem;">Пользователь: <strong>{{ user.username }}</strong> ({{ user.phone_number }})</span>
+            <form action="/api/logout" method="POST" style="margin: 0;">
+                <button type="submit" class="btn btn-danger" style="padding: 8px 14px; font-size: 0.85rem;">Выйти</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="dashboard-grid">
+            <!-- Sidebar Navigation -->
+            <aside class="side-menu">
+                <button class="menu-btn dash-menu-btn active" data-tab="tg-shield">
+                    <span>🛡️</span> Защита Telegram
+                </button>
+                <button class="menu-btn dash-menu-btn" data-tab="site-security">
+                    <span>🔐</span> Защита аккаунта на сайте
+                </button>
+                <button class="menu-btn dash-menu-btn" data-tab="settings">
+                    <span>⚙️</span> Настройки
+                </button>
+            </aside>
+
+            <!-- Main Content Area -->
+            <section class="card" style="padding: 2.2rem;">
+                
+                <!-- Tab 1: Защита Telegram -->
+                <div id="tab-tg-shield" class="dash-tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2>Защита аккаунта Telegram</h2>
+                        {% if config.session_string %}
+                            <span class="badge badge-success">🟢 Защита и Мониторинг АКТИВНЫ</span>
+                        {% else %}
+                            <span class="badge badge-warning">⚠️ Требуется активация</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Dynamic 2FA Cloud Password Card -->
+                    <div style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(79, 172, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.12);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                            <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+                                <span>🔑</span> Одноразовый Облачный Пароль (3FA Ключ)
+                            </h3>
+                            <span class="badge badge-success">Защита включена</span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.2rem;">
+                            При входе в Telegram укажите этот одноразовый пароль. Взломщик никогда не сможет зайти без доступа к вашему сайту!
+                        </p>
+
+                        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                            <div style="background: var(--bg-primary); border: 2px dashed var(--accent-cyan); padding: 12px 24px; border-radius: var(--radius); font-family: monospace; font-size: 1.4rem; font-weight: 700; color: var(--text-primary); letter-spacing: 2px;" id="otpCodeDisplay">
+                                ********
+                            </div>
+
+                            <button id="copyOtpBtn" onclick="copyOtpToClipboard()" class="btn btn-secondary" style="width: auto; padding: 12px 18px;">
+                                📋 Скопировать
+                            </button>
+
+                            <button id="generateOtpBtn" onclick="generateNewOtp()" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
+                                ✨ Сгенерировать новый пароль
+                            </button>
+                        </div>
+                        <div id="otpMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
+                    </div>
+
+                    <!-- MTProto Authorization Banner -->
+                    {% if not config.session_string %}
+                    <div style="background: rgba(255, 179, 0, 0.1); border: 1px solid #ffb300; padding: 1.25rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+                        <h3 style="color: #ffb300; font-size: 1.05rem; margin-bottom: 0.5rem;">📱 Активация мониторинга и защиты</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                            Авторизуйте прямую привязку аккаунта для мгновенного отслеживания устройств.
+                        </p>
+                        <button id="sendMtprotoCodeBtn" onclick="onSendMtprotoCodeClick(event)" class="btn btn-primary" style="width: auto; padding: 10px 20px;">
+                            🚀 Подключить прямой мониторинг Telegram
+                        </button>
+                        <div id="mtprotoStatusMsg" style="margin-top: 10px; font-size: 0.9rem;"></div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Device Limit Control -->
+                    <div style="background: var(--bg-primary); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border-color); margin-bottom: 2rem;">
+                        <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Ограничение количества устройств</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                            Укажите максимальное количество устройств, которым разрешено находиться в вашем аккаунте.
+                        </p>
+
+                        <form id="deviceLimitForm" style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                            <div style="width: 140px;">
+                                <input type="number" id="deviceLimitInput" name="device_limit" class="form-control" min="1" max="20" value="{{ config.device_limit }}" required style="font-size: 1.1rem; font-weight: 700; text-align: center;">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 24px;">Сохранить лимит</button>
+                            <span id="limitUpdateMsg" style="font-size: 0.9rem;"></span>
+                        </form>
+                    </div>
+
+                    <!-- Active Sessions Watchdog -->
+                    <h3 style="font-size: 1.1rem; margin-bottom: 1rem;">Активные сессии в Telegram</h3>
+                    {% if real_sessions %}
+                    <table class="session-table">
+                        <thead>
+                            <tr>
+                                <th>Устройство / Приложение</th>
+                                <th>IP-адрес</th>
+                                <th>Страна</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in real_sessions %}
+                            <tr>
+                                <td>
+                                    <strong>{{ s.device_model }} ({{ s.app_name }})</strong><br>
+                                    <small style="color: var(--text-secondary);">{{ s.platform }} {{ s.system_version }}</small>
+                                </td>
+                                <td>{{ s.ip }}</td>
+                                <td>{{ s.country or 'Неизвестно' }}</td>
+                                <td>
+                                    {% if s.current %}
+                                        <span class="badge badge-success">Страж сайта</span>
+                                    {% elif loop.index <= config.device_limit %}
+                                        <span class="badge badge-success">Разрешено (Устройство #{{ loop.index }})</span>
+                                    {% else %}
+                                        <span class="badge badge-warning" style="background: rgba(255, 77, 77, 0.2); color: var(--accent-red); border-color: var(--accent-red);">🚨 Лишнее устройство #{{ loop.index }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+                        Подключите мониторинг выше, чтобы увидеть список сессий.
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Tab 2: Защита аккаунта на сайте -->
+                <div id="tab-site-security" class="dash-tab-content" style="display: none;">
+                    <h2 style="margin-bottom: 1.5rem;">Защита аккаунта на сайте</h2>
+
+                    <div style="margin-bottom: 2rem;">
+                        <h3 style="font-size: 1.05rem; margin-bottom: 1rem;">Смена пароля веб-кабинета</h3>
+                        <form style="max-width: 400px;">
+                            <div class="form-group">
+                                <label>Текущий пароль</label>
+                                <input type="password" class="form-control" placeholder="••••••••">
+                            </div>
+                            <div class="form-group">
+                                <label>Новый пароль</label>
+                                <input type="password" class="form-control" placeholder="Новый надежный пароль">
+                            </div>
+                            <button type="button" class="btn btn-secondary">Обновить пароль</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Настройки -->
+                <div id="tab-settings" class="dash-tab-content" style="display: none;">
+                    <h2 style="margin-bottom: 1.5rem;">Настройки системы</h2>
+
+                    <form id="settingsForm">
+                        <div class="form-group" style="max-width: 500px;">
+                            <label for="apiIdInput">Telegram API ID (Необязательно)</label>
+                            <input type="text" id="apiIdInput" name="api_id" class="form-control" value="{{ config.api_id or '' }}" placeholder="По умолчанию: официальные ключи">
+                        </div>
+
+                        <div class="form-group" style="max-width: 500px;">
+                            <label for="apiHashInput">Telegram API Hash (Необязательно)</label>
+                            <input type="text" id="apiHashInput" name="api_hash" class="form-control" value="{{ config.api_hash or '' }}" placeholder="По умолчанию: официальные ключи">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width: auto; padding: 10px 24px; margin-top: 10px;">Сохранить настройки</button>
+                        <span id="settingsStatusMsg" style="margin-left: 10px; font-size: 0.9rem;"></span>
+                    </form>
+                </div>
+
+            </section>
+        </div>
+    </main>
+
+    <!-- Modal: MTProto Code Input -->
+    <div id="mtprotoModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 0.8rem;">Активация Защиты</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                Мы отправили системный код в ваше приложение Telegram. Введите полученный 5-значный код:
+            </p>
+
+            <form id="mtprotoVerifyForm">
+                <div class="form-group">
+                    <label for="mtprotoCodeInput">Введите код из сообщения Telegram</label>
+                    <input type="text" id="mtprotoCodeInput" name="code" class="form-control code-input" placeholder="12345" maxlength="6" required>
+                </div>
+
+                <div id="2faContainer" class="form-group" style="display: none;">
+                    <label for="mtproto2faInput">Облачный пароль (2FA)</label>
+                    <input type="password" id="mtproto2faInput" name="password" class="form-control" placeholder="Ваш пароль 2FA">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">Активировать защиту</button>
+                <button type="button" id="closeMtprotoModalBtn" class="btn btn-secondary" style="margin-top: 0.5rem;">Отмена</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=4"></script>
+</body>
+</html>
