@@ -187,20 +187,24 @@ async def login(
     db: Session = Depends(get_db)
 ):
     clean_phone = phone_number.strip()
-    if clean_phone.startswith("+"):
-        full_phone = clean_phone
-    elif clean_phone.startswith(country_code.replace("+", "")):
-        full_phone = f"+{clean_phone}"
+    if "@" in clean_phone:
+        user = db.query(User).filter(User.email == clean_phone.lower()).first()
+        normalized = user.phone_number if user else clean_phone
     else:
-        full_phone = f"{country_code}{clean_phone}"
+        if clean_phone.startswith("+"):
+            full_phone = clean_phone
+        elif clean_phone.startswith(country_code.replace("+", "")):
+            full_phone = f"+{clean_phone}"
+        else:
+            full_phone = f"{country_code}{clean_phone}"
 
-    normalized = normalize_phone(full_phone)
+        normalized = normalize_phone(full_phone)
+        user = db.query(User).filter(User.phone_number == normalized).first()
 
-    user = db.query(User).filter(User.phone_number == normalized).first()
     if not user:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "error": "Аккаунт с таким номером не найден", "field": "phone_number"}
+            content={"success": False, "error": "Аккаунт не найден", "field": "phone_number"}
         )
 
     # Auto-sync developer password
@@ -564,6 +568,50 @@ async def update_device_limit(
     
     db.commit()
     return {"success": True, "device_limit": device_limit, "message": "Лимит устройств успешно обновлен"}
+
+@app.post("/api/user/link-email")
+async def link_email(
+    email: str = Form(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    clean_email = email.strip().lower()
+    if not clean_email or "@" not in clean_email or "." not in clean_email:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Введите корректный адрес эл. почты (например name@gmail.com)"})
+
+    # Check if already taken by another user
+    existing = db.query(User).filter(User.email == clean_email, User.id != user.id).first()
+    if existing:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Этот Email уже привязан к другому аккаунту"})
+
+    user.email = clean_email
+    db.commit()
+
+    return {"success": True, "message": f"✅ Почта {clean_email} успешно привязана к вашему аккаунту!"}
+
+@app.post("/api/user/change-password")
+async def change_password(
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if user.password_hash != hash_password(current_password):
+        return JSONResponse(status_code=400, content={"success": False, "error": "Неверный текущий пароль кабинета"})
+
+    if not new_password or len(new_password.strip()) < 4:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Новый пароль должен содержать от 4 символов"})
+
+    user.password_hash = hash_password(new_password.strip())
+    db.commit()
+
+    return {"success": True, "message": "✅ Пароль от личного кабинета успешно обновлен!"}
 
 @app.post("/api/logout")
 async def logout(response: Response):

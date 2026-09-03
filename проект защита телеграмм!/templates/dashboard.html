@@ -190,18 +190,48 @@
                 <div id="tab-site-security" class="dash-tab-content" style="display: none;">
                     <h2 style="margin-bottom: 1.5rem;">Защита аккаунта на сайте</h2>
 
-                    <div style="margin-bottom: 2rem;">
+                    <!-- Email / Gmail Link Card -->
+                    <div style="background: linear-gradient(135deg, rgba(79, 172, 254, 0.08), rgba(0, 242, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.08);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+                                <span>📧</span> Резервный Email (Gmail)
+                            </h3>
+                            {% if user.email %}
+                                <span class="badge badge-success">✅ Привязан: {{ user.email }}</span>
+                            {% else %}
+                                <span class="badge badge-warning">⚠️ Не привязан</span>
+                            {% endif %}
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.2rem;">
+                            Привяжите почту Gmail, чтобы входить в личный кабинет при потере доступа к Telegram или телефону.
+                        </p>
+
+                        <form id="linkEmailForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 250px;">
+                                <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Адрес электронной почты (Gmail)</label>
+                                <input type="email" id="emailInput" name="email" class="form-control" placeholder="например: vash_email@gmail.com" value="{{ user.email or '' }}" required style="font-weight: 600;">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700;">
+                                💾 Привязать Email
+                            </button>
+                        </form>
+                        <div id="linkEmailMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
+                    </div>
+
+                    <!-- Change Web Password Card -->
+                    <div style="background: var(--bg-primary); border: 1px solid var(--border-color); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem;">
                         <h3 style="font-size: 1.05rem; margin-bottom: 1rem;">Смена пароля веб-кабинета</h3>
-                        <form style="max-width: 400px;">
-                            <div class="form-group">
-                                <label>Текущий пароль</label>
-                                <input type="password" class="form-control" placeholder="••••••••">
+                        <form id="changeWebPasswordForm" style="max-width: 440px;">
+                            <div class="form-group" style="margin-bottom: 1rem;">
+                                <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль</label>
+                                <input type="password" id="currentWebPwdInput" name="current_password" class="form-control" placeholder="••••••••" required>
                             </div>
-                            <div class="form-group">
-                                <label>Новый пароль</label>
-                                <input type="password" class="form-control" placeholder="Новый надежный пароль">
+                            <div class="form-group" style="margin-bottom: 1rem;">
+                                <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Новый надежный пароль</label>
+                                <input type="password" id="newWebPwdInput" name="new_password" class="form-control" placeholder="Минимум 4 символа" required>
                             </div>
-                            <button type="button" class="btn btn-secondary">Обновить пароль</button>
+                            <button type="submit" class="btn btn-secondary" style="padding: 10px 20px;">Обновить пароль</button>
+                            <div id="changeWebPwdMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
                         </form>
                     </div>
                 </div>

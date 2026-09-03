@@ -456,4 +456,82 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Link Email (Gmail) Form Handler
+    const linkEmailForm = document.getElementById('linkEmailForm');
+    if (linkEmailForm) {
+        linkEmailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('linkEmailMsg');
+            if (msgEl) {
+                msgEl.textContent = '⏳ Сохранение адреса...';
+                msgEl.style.color = 'var(--text-secondary)';
+            }
+
+            const formData = new FormData(linkEmailForm);
+            try {
+                const res = await fetch('/api/user/link-email', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (msgEl) {
+                        msgEl.textContent = data.message || '✅ Email успешно привязан!';
+                        msgEl.style.color = 'var(--accent-green)';
+                    }
+                    setTimeout(() => { window.location.reload(); }, 1200);
+                } else {
+                    if (msgEl) {
+                        msgEl.textContent = '❌ ' + (data.error || 'Ошибка привязки email');
+                        msgEl.style.color = 'var(--accent-red)';
+                    }
+                }
+            } catch (err) {
+                if (msgEl) {
+                    msgEl.textContent = 'Ошибка соединения с сервером';
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        });
+    }
+
+    // Change Web Cabinet Password Form Handler
+    const changeWebPasswordForm = document.getElementById('changeWebPasswordForm');
+    if (changeWebPasswordForm) {
+        changeWebPasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('changeWebPwdMsg');
+            if (msgEl) {
+                msgEl.textContent = '⏳ Обновление пароля...';
+                msgEl.style.color = 'var(--text-secondary)';
+            }
+
+            const formData = new FormData(changeWebPasswordForm);
+            try {
+                const res = await fetch('/api/user/change-password', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (msgEl) {
+                        msgEl.textContent = data.message || '✅ Пароль успешно обновлен!';
+                        msgEl.style.color = 'var(--accent-green)';
+                    }
+                    changeWebPasswordForm.reset();
+                } else {
+                    if (msgEl) {
+                        msgEl.textContent = '❌ ' + (data.error || 'Ошибка обновления пароля');
+                        msgEl.style.color = 'var(--accent-red)';
+                    }
+                }
+            } catch (err) {
+                if (msgEl) {
+                    msgEl.textContent = 'Ошибка соединения с сервером';
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        });
+    }
 });
