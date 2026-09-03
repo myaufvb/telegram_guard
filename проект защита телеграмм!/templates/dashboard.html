@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Панель управления — Telegram Guard</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -183,38 +183,39 @@
 
                     <!-- Active Sessions Watchdog -->
                     <h3 style="font-size: 1.1rem; margin-bottom: 1rem;">Активные сессии в Telegram</h3>
-                    {% if real_sessions %}
-                    <table class="session-table">
-                        <thead>
-                            <tr>
-                                <th>Устройство / Приложение</th>
-                                <th>IP-адрес</th>
-                                <th>Страна</th>
-                                <th>Статус</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for s in real_sessions %}
-                            <tr>
-                                <td>
-                                    <strong>{{ s.device_model }} ({{ s.app_name }})</strong><br>
-                                    <small style="color: var(--text-secondary);">{{ s.platform }} {{ s.system_version }}</small>
-                                </td>
-                                <td>{{ s.ip }}</td>
-                                <td>{{ s.country or 'Неизвестно' }}</td>
-                                <td>
-                                    {% if s.current %}
-                                        <span class="badge badge-success">Страж сайта</span>
-                                    {% elif loop.index <= config.device_limit %}
-                                        <span class="badge badge-success">Разрешено (Устройство #{{ loop.index }})</span>
-                                    {% else %}
-                                        <span class="badge badge-warning" style="background: rgba(255, 77, 77, 0.2); color: var(--accent-red); border-color: var(--accent-red);">🚨 Лишнее устройство #{{ loop.index }}</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <div style="width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 1rem;">
+                        <table class="session-table">
+                            <thead>
+                                <tr>
+                                    <th>Устройство / Приложение</th>
+                                    <th>IP-адрес</th>
+                                    <th>Страна</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in real_sessions %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ s.device_model }} ({{ s.app_name }})</strong><br>
+                                        <small style="color: var(--text-secondary);">{{ s.platform }} {{ s.system_version }}</small>
+                                    </td>
+                                    <td>{{ s.ip }}</td>
+                                    <td>{{ s.country or 'Неизвестно' }}</td>
+                                    <td>
+                                        {% if s.current %}
+                                            <span class="badge badge-success">Страж сайта</span>
+                                        {% elif loop.index <= config.device_limit %}
+                                            <span class="badge badge-success">Разрешено (Устройство #{{ loop.index }})</span>
+                                        {% else %}
+                                            <span class="badge badge-warning" style="background: rgba(255, 77, 77, 0.2); color: var(--accent-red); border-color: var(--accent-red);">🚨 Лишнее устройство #{{ loop.index }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                     {% else %}
                     <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
                         Подключите мониторинг выше, чтобы увидеть список сессий.
@@ -243,29 +244,29 @@
                         </p>
 
                         <!-- Step 1: Request Code Form -->
-                        <form id="requestEmailCodeForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-                            <div style="flex: 1; min-width: 250px;">
+                        <form id="requestEmailCodeForm" class="email-form-row" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px; max-width: 100%;">
                                 <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Адрес электронной почты (Gmail)</label>
                                 <input type="email" id="emailInput" name="email" class="form-control" placeholder="например: vash_email@gmail.com" value="{{ user.email or '' }}" required style="font-weight: 600;">
                             </div>
-                            <button type="submit" id="requestEmailCodeBtn" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700;">
+                            <button type="submit" id="requestEmailCodeBtn" class="btn btn-primary" style="padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; white-space: nowrap;">
                                 📩 Получить код на Gmail
                             </button>
                         </form>
 
                         <!-- Step 2: Enter Code Form (Hidden until code requested) -->
-                        <form id="verifyEmailCodeForm" style="display: none; margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px dashed rgba(0, 242, 254, 0.3);">
+                        <form id="verifyEmailCodeForm" class="verify-form-row" style="display: none; margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px dashed rgba(0, 242, 254, 0.3);">
                             <label style="font-size: 0.88rem; color: var(--accent-cyan); margin-bottom: 6px; display: block; font-weight: 700;">
                                 ✉️ Введите 6-значный проверочный код из письма:
                             </label>
-                            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                                <div style="width: 200px;">
-                                    <input type="text" id="emailCodeInput" name="code" class="form-control" placeholder="123456" maxlength="6" required style="letter-spacing: 6px; font-size: 1.3rem; font-weight: 800; text-align: center;">
+                            <div class="verify-inputs-wrap" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                                <div style="max-width: 100%;">
+                                    <input type="text" id="emailCodeInput" name="code" class="form-control" placeholder="123456" maxlength="6" required style="letter-spacing: 6px; font-size: 1.3rem; font-weight: 800; text-align: center; width: 180px; max-width: 100%;">
                                 </div>
-                                <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 24px; font-weight: 700;">
+                                <button type="submit" class="btn btn-primary" style="padding: 12px 24px; font-weight: 700; white-space: nowrap;">
                                     ✅ Подтвердить и привязать
                                 </button>
-                                <button type="button" id="cancelEmailCodeBtn" class="btn btn-secondary" style="width: auto; padding: 12px 18px;">
+                                <button type="button" id="cancelEmailCodeBtn" class="btn btn-secondary" style="padding: 12px 18px;">
                                     Отмена
                                 </button>
                             </div>

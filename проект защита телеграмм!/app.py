@@ -691,8 +691,13 @@ async def verify_email_code(
     user.email = target_email
     db.commit()
 
-    # Send success confirmation email
-    send_linked_success_email(target_email, user.phone_number)
+    # Send success confirmation email asynchronously in background so response is INSTANT!
+    try:
+        import threading
+        threading.Thread(target=send_linked_success_email, args=(target_email, user.phone_number), daemon=True).start()
+    except Exception as e:
+        logging.error(f"Background email error: {e}")
+
     pending_email_codes.pop(user.id, None)
 
     return {"success": True, "email": target_email, "message": f"✅ Почта {target_email} успешно подтверждена и привязана!"}
