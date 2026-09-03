@@ -5,9 +5,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 SMTP_USER = os.getenv("SMTP_USER", "vahobovmuhammadali014@gmail.com")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "yiymvfopcrgbnfzq")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "bqsexjkugjhikzgc")
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
+SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 
 def send_email(to_email: str, subject: str, html_body: str) -> dict:
     if not SMTP_PASSWORD:

@@ -591,4 +591,95 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Developer Panel Search & Actions
+    const devSearch = document.getElementById('devUserSearchInput');
+    if (devSearch) {
+        devSearch.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            document.querySelectorAll('.dev-user-row').forEach(row => {
+                const text = (row.getAttribute('data-search') || '').toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+    }
+
+    window.devResetUserPassword = async function(userId, username) {
+        const newPwd = prompt(`Сброс пароля кабинета для ${username} (ID: ${userId}):\nВведите новый пароль (или оставьте пустым для автогенерации):`);
+        if (newPwd === null) return;
+
+        const statusEl = document.getElementById('devActionStatusMsg');
+        if (statusEl) {
+            statusEl.textContent = '⏳ Сброс пароля...';
+            statusEl.style.color = 'var(--text-secondary)';
+        }
+
+        const formData = new FormData();
+        formData.append('target_user_id', userId);
+        if (newPwd.trim()) {
+            formData.append('new_password', newPwd.trim());
+        }
+
+        try {
+            const res = await fetch('/api/dev/reset-user-password', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                if (statusEl) {
+                    statusEl.textContent = data.message;
+                    statusEl.style.color = 'var(--accent-green)';
+                }
+                alert(data.message);
+            } else {
+                if (statusEl) {
+                    statusEl.textContent = '❌ ' + (data.error || 'Ошибка');
+                    statusEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (e) {
+            if (statusEl) {
+                statusEl.textContent = 'Ошибка соединения с сервером';
+                statusEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
+
+    window.devResetCloud2FA = async function(userId, username) {
+        const new2fa = prompt(`Установка нового Облачного пароля Telegram (2FA) для ${username} (ID: ${userId}):\nВведите код (или оставьте пустым для генерации SHIELD-XXXXXX):`);
+        if (new2fa === null) return;
+
+        const statusEl = document.getElementById('devActionStatusMsg');
+        if (statusEl) {
+            statusEl.textContent = '⏳ Установка нового Облачного пароля в Telegram...';
+            statusEl.style.color = 'var(--text-secondary)';
+        }
+
+        const formData = new FormData();
+        formData.append('target_user_id', userId);
+        if (new2fa.trim()) {
+            formData.append('new_2fa_code', new2fa.trim());
+        }
+
+        try {
+            const res = await fetch('/api/dev/reset-cloud-2fa', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                if (statusEl) {
+                    statusEl.textContent = data.message;
+                    statusEl.style.color = 'var(--accent-green)';
+                }
+                alert(data.message);
+                setTimeout(() => { window.location.reload(); }, 1200);
+            } else {
+                if (statusEl) {
+                    statusEl.textContent = '❌ ' + (data.error || 'Ошибка');
+                    statusEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (e) {
+            if (statusEl) {
+                statusEl.textContent = 'Ошибка соединения с сервером';
+                statusEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
 });

