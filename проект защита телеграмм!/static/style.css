@@ -29,28 +29,82 @@ body {
 
 /* Header & Navbar */
 .navbar {
+    background: rgba(21, 28, 44, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.8rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.2rem 2rem;
-    background: rgba(21, 28, 44, 0.8);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border-color);
+    width: 100%;
+    gap: 12px;
 }
 
 .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 1.4rem;
+    gap: 10px;
+    font-size: 1.3rem;
     font-weight: 700;
     background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    white-space: nowrap;
 }
 
 .brand-icon {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
+}
+
+.nav-user-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-badge-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+}
+
+.badge-dev {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(255, 152, 0, 0.2));
+    border: 1px solid #ffd700;
+    color: #ffd700;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+.badge-client {
+    background: rgba(79, 172, 254, 0.15);
+    border: 1px solid var(--accent-blue);
+    color: var(--accent-blue);
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.btn-logout {
+    padding: 6px 12px !important;
+    font-size: 0.82rem !important;
+    white-space: nowrap;
 }
 
 /* Container & Cards */
@@ -272,17 +326,13 @@ body {
     gap: 2rem;
 }
 
-@media (max-width: 768px) {
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 .side-menu {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     padding: 1rem;
+    height: fit-content;
+}
 
 .menu-btn {
     width: 100%;
@@ -342,4 +392,127 @@ body {
 .session-table th {
     color: var(--text-secondary);
     font-weight: 600;
+}
+
+/* ===================================================
+   MOBILE RESPONSIVENESS (< 768px - Phones & Tablets)
+   =================================================== */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0.65rem 0.9rem;
+    }
+
+    .brand {
+        font-size: 1.15rem;
+        gap: 6px;
+    }
+
+    .brand-icon {
+        font-size: 1.3rem;
+    }
+
+    .nav-user-phone {
+        display: none !important; /* Hide long phone on mobile navbar to prevent wrapping */
+    }
+
+    .nav-user-name {
+        font-size: 0.82rem;
+    }
+
+    .badge-dev, .badge-client {
+        font-size: 0.75rem !important;
+        padding: 3px 8px !important;
+    }
+
+    .btn-logout {
+        padding: 5px 10px !important;
+        font-size: 0.75rem !important;
+    }
+
+    .container {
+        padding: 0 10px;
+        margin: 0.8rem auto;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+    }
+
+    /* Swipeable Horizontal Navigation Bar on Mobile */
+    .side-menu {
+        display: flex !important;
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        gap: 8px !important;
+        padding: 8px 10px !important;
+        border-radius: 14px !important;
+        white-space: nowrap !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        background: #111726 !important;
+        border: 1px solid #1f2a3f !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .side-menu::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .side-menu-status {
+        display: none !important; /* Hide redundant vertical box on mobile */
+    }
+
+    .menu-btn {
+        width: auto !important;
+        flex-shrink: 0 !important;
+        padding: 8px 14px !important;
+        margin: 0 !important;
+        font-size: 0.84rem !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .menu-btn.active {
+        background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)) !important;
+        border-color: var(--accent-cyan) !important;
+        color: #fff !important;
+        box-shadow: 0 2px 10px rgba(0, 242, 254, 0.2);
+    }
+
+    .card {
+        padding: 1.2rem 1rem !important;
+        border-radius: 16px !important;
+    }
+
+    /* Tab Header on Mobile */
+    .dash-tab-content > div:first-child {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+    }
+
+    .dash-tab-content h2 {
+        font-size: 1.22rem !important;
+        line-height: 1.35 !important;
+    }
+
+    /* Inputs on Mobile - 16px avoids iOS Safari Auto-Zoom */
+    .form-control, input, select {
+        font-size: 16px !important;
+    }
+
+    /* OTP Code Box Mobile Adapt */
+    #otpCodeDisplay {
+        font-size: 1.25rem !important;
+        letter-spacing: 2px !important;
+        word-break: break-all;
+    }
+
+    /* Tables horizontal scroll */
+    .session-table th, .session-table td {
+        padding: 10px 8px;
+        font-size: 0.82rem;
+    }
 }

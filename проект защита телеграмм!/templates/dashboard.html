@@ -8,28 +8,31 @@
 </head>
 <body>
     <header class="navbar">
-        <div class="brand">
-            <span class="brand-icon">🛡️</span>
-            <span>Telegram Guard Shield</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="color: var(--text-secondary); font-size: 0.9rem;">
-                    Пользователь: <strong style="color: var(--text-primary);">{{ user.username }}</strong> ({{ user.phone_number }})
-                </span>
-                {% if user.is_developer %}
-                    <span class="badge" style="background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(255, 152, 0, 0.2)); border: 1px solid #ffd700; color: #ffd700; font-weight: 700; font-size: 0.82rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);">
-                        👑 Разработчик
-                    </span>
-                {% else %}
-                    <span class="badge" style="background: rgba(79, 172, 254, 0.15); border: 1px solid var(--accent-blue); color: var(--accent-blue); font-weight: 600; font-size: 0.82rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">
-                        👤 Клиент
-                    </span>
-                {% endif %}
+        <div class="nav-container">
+            <div class="brand">
+                <span class="brand-icon">🛡️</span>
+                <span class="brand-text">Telegram Guard</span>
             </div>
-            <form action="/api/logout" method="POST" style="margin: 0;">
-                <button type="submit" class="btn btn-danger" style="padding: 6px 14px; font-size: 0.85rem;">Выйти</button>
-            </form>
+            <div class="nav-user-bar">
+                <div class="user-badge-wrap">
+                    <span class="nav-user-name">
+                        <strong style="color: var(--text-primary);">{{ user.username }}</strong>
+                        <span class="nav-user-phone">({{ user.phone_number }})</span>
+                    </span>
+                    {% if user.is_developer %}
+                        <span class="badge badge-dev">
+                            👑 Разработчик
+                        </span>
+                    {% else %}
+                        <span class="badge badge-client">
+                            👤 Клиент
+                        </span>
+                    {% endif %}
+                </div>
+                <form action="/api/logout" method="POST" style="margin: 0;">
+                    <button type="submit" class="btn btn-danger btn-logout">Выйти</button>
+                </form>
+            </div>
         </div>
     </header>
 
@@ -37,7 +40,7 @@
         <div class="dashboard-grid">
             <!-- Sidebar Navigation -->
             <aside class="side-menu">
-                <div style="padding: 0.8rem 1rem 1.2rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem;">
+                <div class="side-menu-status" style="padding: 0.8rem 1rem 1.2rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem;">
                     <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Статус аккаунта:</div>
                     {% if user.is_developer %}
                         <div style="color: #ffd700; font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
