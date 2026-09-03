@@ -30,9 +30,14 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     phone_number = Column(String(30), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=True, index=True)
+    role = Column(String(20), default="client")
     password_hash = Column(String(255), nullable=False)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    @property
+    def is_developer(self):
+        return self.phone_number == "+998334906969" or self.role == "developer"
 
     protection_config = relationship("TelegramProtectionConfig", back_populates="user", uselist=False)
 
@@ -86,6 +91,11 @@ def init_db():
             pass
         try:
             conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(100)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'client'"))
             conn.commit()
         except Exception:
             pass

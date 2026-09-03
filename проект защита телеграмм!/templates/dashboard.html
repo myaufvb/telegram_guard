@@ -12,10 +12,23 @@
             <span class="brand-icon">🛡️</span>
             <span>Telegram Guard Shield</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <span style="color: var(--text-secondary); font-size: 0.9rem;">Пользователь: <strong>{{ user.username }}</strong> ({{ user.phone_number }})</span>
+        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--text-secondary); font-size: 0.9rem;">
+                    Пользователь: <strong style="color: var(--text-primary);">{{ user.username }}</strong> ({{ user.phone_number }})
+                </span>
+                {% if user.is_developer %}
+                    <span class="badge" style="background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(255, 152, 0, 0.2)); border: 1px solid #ffd700; color: #ffd700; font-weight: 700; font-size: 0.82rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);">
+                        👑 Разработчик
+                    </span>
+                {% else %}
+                    <span class="badge" style="background: rgba(79, 172, 254, 0.15); border: 1px solid var(--accent-blue); color: var(--accent-blue); font-weight: 600; font-size: 0.82rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">
+                        👤 Клиент
+                    </span>
+                {% endif %}
+            </div>
             <form action="/api/logout" method="POST" style="margin: 0;">
-                <button type="submit" class="btn btn-danger" style="padding: 8px 14px; font-size: 0.85rem;">Выйти</button>
+                <button type="submit" class="btn btn-danger" style="padding: 6px 14px; font-size: 0.85rem;">Выйти</button>
             </form>
         </div>
     </header>
@@ -24,6 +37,18 @@
         <div class="dashboard-grid">
             <!-- Sidebar Navigation -->
             <aside class="side-menu">
+                <div style="padding: 0.8rem 1rem 1.2rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Статус аккаунта:</div>
+                    {% if user.is_developer %}
+                        <div style="color: #ffd700; font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                            <span>👑</span> <span>Разработчик</span>
+                        </div>
+                    {% else %}
+                        <div style="color: var(--accent-blue); font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                            <span>👤</span> <span>Клиент</span>
+                        </div>
+                    {% endif %}
+                </div>
                 <button class="menu-btn dash-menu-btn active" data-tab="tg-shield">
                     <span>🛡️</span> Защита Telegram
                 </button>
@@ -190,7 +215,7 @@
                 <div id="tab-site-security" class="dash-tab-content" style="display: none;">
                     <h2 style="margin-bottom: 1.5rem;">Защита аккаунта на сайте</h2>
 
-                    <!-- Email / Gmail Link Card -->
+                    <!-- Email / Gmail Link Card with 2-step Verification -->
                     <div style="background: linear-gradient(135deg, rgba(79, 172, 254, 0.08), rgba(0, 242, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.08);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
                             <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
@@ -203,19 +228,39 @@
                             {% endif %}
                         </div>
                         <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.2rem;">
-                            Привяжите почту Gmail, чтобы входить в личный кабинет при потере доступа к Telegram или телефону.
+                            Для безопасности привязки на ваш Gmail высылается <strong>6-значный проверочный код</strong>.
                         </p>
 
-                        <form id="linkEmailForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                        <!-- Step 1: Request Code Form -->
+                        <form id="requestEmailCodeForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
                             <div style="flex: 1; min-width: 250px;">
                                 <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Адрес электронной почты (Gmail)</label>
                                 <input type="email" id="emailInput" name="email" class="form-control" placeholder="например: vash_email@gmail.com" value="{{ user.email or '' }}" required style="font-weight: 600;">
                             </div>
-                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700;">
-                                💾 Привязать Email
+                            <button type="submit" id="requestEmailCodeBtn" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700;">
+                                📩 Получить код на Gmail
                             </button>
                         </form>
-                        <div id="linkEmailMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
+
+                        <!-- Step 2: Enter Code Form (Hidden until code requested) -->
+                        <form id="verifyEmailCodeForm" style="display: none; margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px dashed rgba(0, 242, 254, 0.3);">
+                            <label style="font-size: 0.88rem; color: var(--accent-cyan); margin-bottom: 6px; display: block; font-weight: 700;">
+                                ✉️ Введите 6-значный проверочный код из письма:
+                            </label>
+                            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                                <div style="width: 200px;">
+                                    <input type="text" id="emailCodeInput" name="code" class="form-control" placeholder="123456" maxlength="6" required style="letter-spacing: 6px; font-size: 1.3rem; font-weight: 800; text-align: center;">
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 24px; font-weight: 700;">
+                                    ✅ Подтвердить и привязать
+                                </button>
+                                <button type="button" id="cancelEmailCodeBtn" class="btn btn-secondary" style="width: auto; padding: 12px 18px;">
+                                    Отмена
+                                </button>
+                            </div>
+                        </form>
+
+                        <div id="emailActionMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
                     </div>
 
                     <!-- Change Web Password Card -->

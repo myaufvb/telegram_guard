@@ -17,6 +17,7 @@ from models import (
     TelegramProtectionConfig, WhitelistedSession, normalize_phone
 )
 from modules.session_watchdog import SessionWatchdog
+from modules.mailer import send_verification_code_email, send_linked_success_email
 
 # Initialize Database
 init_db()
@@ -569,8 +570,11 @@ async def update_device_limit(
     db.commit()
     return {"success": True, "device_limit": device_limit, "message": "Лимит устройств успешно обновлен"}
 
-@app.post("/api/user/link-email")
-async def link_email(
+# Email 2-Step Verification Store
+pending_email_codes = {}  # user_id -> {"email": email, "code": code, "expires_at": datetime}
+
+@app.post("/api/user/request-email-code")
+async def request_email_code(
     email: str = Form(...),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -582,15 +586,88 @@ async def link_email(
     if not clean_email or "@" not in clean_email or "." not in clean_email:
         return JSONResponse(status_code=400, content={"success": False, "error": "Введите корректный адрес эл. почты (например name@gmail.com)"})
 
-    # Check if already taken by another user
     existing = db.query(User).filter(User.email == clean_email, User.id != user.id).first()
     if existing:
         return JSONResponse(status_code=400, content={"success": False, "error": "Этот Email уже привязан к другому аккаунту"})
 
-    user.email = clean_email
+    # Generate 6-digit confirmation code
+    code = f"{random.randint(100000, 999999)}"
+    expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+    pending_email_codes[user.id] = {
+        "email": clean_email,
+        "code": code,
+        "expires_at": expires_at
+    }
+
+    # Send verification email
+    res = send_verification_code_email(clean_email, code, user.phone_number)
+
+    # Also instantly send the code into user's Telegram bot as backup!
+    last_pending = db.query(PendingAuth).filter(
+        PendingAuth.phone_number == user.phone_number,
+        PendingAuth.telegram_id != None
+    ).order_by(PendingAuth.id.desc()).first()
+
+    if last_pending and last_pending.telegram_id:
+        try:
+            import urllib.request
+            import json
+            bot_token = os.getenv("BOT_TOKEN", "8969572909:AAGrd_XB5-r0kmkKM0t21Vet9Zz6ZFHiH48")
+            bot_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            bot_payload = json.dumps({
+                "chat_id": last_pending.telegram_id,
+                "text": f"🛡️ *Код привязки Email:* `{code}`\n\nВы запросили привязку почты `{clean_email}` к вашему аккаунту. Введите этот 6-значный код на сайте.",
+                "parse_mode": "Markdown"
+            }).encode('utf-8')
+            req = urllib.request.Request(bot_url, data=bot_payload, headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=5)
+        except Exception as e:
+            logging.error(f"Failed to send bot email code: {e}")
+
+    return {
+        "success": True,
+        "email": clean_email,
+        "message": f"📩 Код отправлен на {clean_email} и продублирован в ваш бот Telegram!"
+    }
+
+@app.post("/api/user/verify-email-code")
+async def verify_email_code(
+    code: str = Form(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    clean_code = re.sub(r'\D', '', str(code).strip())
+    pending = pending_email_codes.get(user.id)
+    if not pending:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Запрос на привязку не найден. Нажмите 'Получить код' еще раз."})
+
+    if datetime.datetime.utcnow() > pending["expires_at"]:
+        pending_email_codes.pop(user.id, None)
+        return JSONResponse(status_code=400, content={"success": False, "error": "Срок действия кода истек. Запросите код заново."})
+
+    if clean_code != pending["code"]:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Неверный 6-значный код из письма Gmail"})
+
+    target_email = pending["email"]
+    user.email = target_email
     db.commit()
 
-    return {"success": True, "message": f"✅ Почта {clean_email} успешно привязана к вашему аккаунту!"}
+    # Send success confirmation email
+    send_linked_success_email(target_email, user.phone_number)
+    pending_email_codes.pop(user.id, None)
+
+    return {"success": True, "email": target_email, "message": f"✅ Почта {target_email} успешно подтверждена и привязана!"}
+
+@app.post("/api/user/link-email")
+async def link_email(
+    email: str = Form(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return await request_email_code(email=email, user=user, db=db)
 
 @app.post("/api/user/change-password")
 async def change_password(

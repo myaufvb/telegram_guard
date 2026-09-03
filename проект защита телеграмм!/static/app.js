@@ -457,40 +457,97 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Link Email (Gmail) Form Handler
-    const linkEmailForm = document.getElementById('linkEmailForm');
-    if (linkEmailForm) {
-        linkEmailForm.addEventListener('submit', async (e) => {
+    // 2-Step Email Verification Handlers
+    const requestEmailCodeForm = document.getElementById('requestEmailCodeForm');
+    const verifyEmailCodeForm = document.getElementById('verifyEmailCodeForm');
+    const emailActionMsg = document.getElementById('emailActionMsg');
+    const cancelEmailCodeBtn = document.getElementById('cancelEmailCodeBtn');
+    const targetEmailLabel = document.getElementById('targetEmailLabel');
+
+    if (requestEmailCodeForm) {
+        requestEmailCodeForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const msgEl = document.getElementById('linkEmailMsg');
-            if (msgEl) {
-                msgEl.textContent = '⏳ Сохранение адреса...';
-                msgEl.style.color = 'var(--text-secondary)';
+            const emailInput = document.getElementById('emailInput');
+            const targetEmail = emailInput ? emailInput.value.trim() : '';
+
+            if (emailActionMsg) {
+                emailActionMsg.textContent = '⏳ Отправка проверочного кода на ' + targetEmail + '...';
+                emailActionMsg.style.color = 'var(--text-secondary)';
             }
 
-            const formData = new FormData(linkEmailForm);
+            const formData = new FormData(requestEmailCodeForm);
             try {
-                const res = await fetch('/api/user/link-email', {
+                const res = await fetch('/api/user/request-email-code', {
                     method: 'POST',
                     body: formData
                 });
                 const data = await res.json();
                 if (data.success) {
-                    if (msgEl) {
-                        msgEl.textContent = data.message || '✅ Email успешно привязан!';
-                        msgEl.style.color = 'var(--accent-green)';
+                    if (emailActionMsg) {
+                        emailActionMsg.textContent = data.message || '📩 Код отправлен на вашу почту!';
+                        emailActionMsg.style.color = 'var(--accent-cyan)';
                     }
-                    setTimeout(() => { window.location.reload(); }, 1200);
+                    if (targetEmailLabel) targetEmailLabel.textContent = targetEmail;
+                    if (verifyEmailCodeForm) {
+                        verifyEmailCodeForm.style.display = 'block';
+                        const codeInp = document.getElementById('emailCodeInput');
+                        if (codeInp) { codeInp.value = ''; codeInp.focus(); }
+                    }
+                    requestEmailCodeForm.style.display = 'none';
                 } else {
-                    if (msgEl) {
-                        msgEl.textContent = '❌ ' + (data.error || 'Ошибка привязки email');
-                        msgEl.style.color = 'var(--accent-red)';
+                    if (emailActionMsg) {
+                        emailActionMsg.textContent = '❌ ' + (data.error || 'Ошибка отправки кода');
+                        emailActionMsg.style.color = 'var(--accent-red)';
                     }
                 }
             } catch (err) {
-                if (msgEl) {
-                    msgEl.textContent = 'Ошибка соединения с сервером';
-                    msgEl.style.color = 'var(--accent-red)';
+                if (emailActionMsg) {
+                    emailActionMsg.textContent = 'Ошибка соединения с сервером';
+                    emailActionMsg.style.color = 'var(--accent-red)';
+                }
+            }
+        });
+    }
+
+    if (cancelEmailCodeBtn) {
+        cancelEmailCodeBtn.addEventListener('click', () => {
+            if (verifyEmailCodeForm) verifyEmailCodeForm.style.display = 'none';
+            if (requestEmailCodeForm) requestEmailCodeForm.style.display = 'flex';
+            if (emailActionMsg) emailActionMsg.textContent = '';
+        });
+    }
+
+    if (verifyEmailCodeForm) {
+        verifyEmailCodeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (emailActionMsg) {
+                emailActionMsg.textContent = '⏳ Проверка кода...';
+                emailActionMsg.style.color = 'var(--text-secondary)';
+            }
+
+            const formData = new FormData(verifyEmailCodeForm);
+            try {
+                const res = await fetch('/api/user/verify-email-code', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (emailActionMsg) {
+                        emailActionMsg.textContent = data.message || '✅ Почта успешно подтверждена и привязана!';
+                        emailActionMsg.style.color = 'var(--accent-green)';
+                    }
+                    setTimeout(() => { window.location.reload(); }, 1500);
+                } else {
+                    if (emailActionMsg) {
+                        emailActionMsg.textContent = '❌ ' + (data.error || 'Неверный код');
+                        emailActionMsg.style.color = 'var(--accent-red)';
+                    }
+                }
+            } catch (err) {
+                if (emailActionMsg) {
+                    emailActionMsg.textContent = 'Ошибка соединения с сервером';
+                    emailActionMsg.style.color = 'var(--accent-red)';
                 }
             }
         });
