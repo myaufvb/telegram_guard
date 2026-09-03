@@ -51,30 +51,68 @@
 
                     <!-- Dynamic 2FA Cloud Password Card -->
                     <div style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(79, 172, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.12);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
                             <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
-                                <span>🔑</span> Управление Облачным Паролем (2FA Telegram)
+                                <span>🔑</span> Динамический Облачный Пароль (2FA Telegram)
                             </h3>
-                            <span class="badge badge-success">Защита активна</span>
+                            {% if config.current_2fa_otp %}
+                                <span class="badge badge-success">🔐 Пароль активен в Telegram</span>
+                            {% else %}
+                                <span class="badge badge-warning">⚠️ Пароль не сгенерирован</span>
+                            {% endif %}
                         </div>
-                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.2rem;">
-                            Установите или смените ваш Облачный пароль в Telegram прямо с сайта в 1 клик!
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.4rem;">
+                            Одноразовый облачный пароль привязывается к вашему Telegram и <strong>виден только вам на этом сайте</strong>. Ни один злоумышленник не сможет войти в ваш Telegram без этого кода!
                         </p>
 
-                        <form id="custom2faForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-                            <div style="flex: 1; min-width: 200px;">
-                                <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Новый Облачный пароль</label>
-                                <input type="text" id="newCustom2faInput" name="new_password" class="form-control" placeholder="Например: 2010090900" required style="font-weight: 700;">
+                        <!-- Big OTP Code Display Box -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-primary); border: 2px dashed var(--accent-cyan); border-radius: 10px; padding: 1rem 1.4rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <small style="color: var(--text-secondary); display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Текущий облачный пароль на сайте:</small>
+                                <span id="otpCodeDisplay" style="font-family: 'Courier New', Courier, monospace; font-size: 1.6rem; font-weight: 800; letter-spacing: 3px; color: var(--accent-cyan);">
+                                    {{ config.current_2fa_otp or 'НЕ СГЕНЕРИРОВАН' }}
+                                </span>
                             </div>
-                            <div style="flex: 1; min-width: 200px;">
-                                <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль (если ставили)</label>
-                                <input type="text" id="currentCustom2faInput" name="current_password" class="form-control" placeholder="Текущий пароль Telegram">
-                            </div>
-                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
-                                ⚡ Установить пароль в Telegram
+                            <button type="button" id="copyOtpBtn" onclick="copyOtpCode()" class="btn btn-secondary" style="width: auto; padding: 8px 18px; font-size: 0.88rem;">
+                                📋 Скопировать код
                             </button>
-                        </form>
-                        <div id="custom2faMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
+                        </div>
+
+                        <!-- OTP Generator Form -->
+                        <div style="background: rgba(0, 0, 0, 0.2); padding: 1.2rem; border-radius: 8px; margin-bottom: 1.2rem; border: 1px solid rgba(255, 255, 255, 0.05);">
+                            <h4 style="font-size: 0.95rem; margin-bottom: 0.8rem; color: var(--text-primary);">⚡ Генерация нового одноразового пароля</h4>
+                            <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 200px;">
+                                    <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль в Telegram (если был установлен)</label>
+                                    <input type="text" id="otpCurrentPassword" class="form-control" placeholder="Оставьте пустым, если не ставили">
+                                </div>
+                                <button type="button" onclick="generateNewOtp()" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
+                                    🔄 Сгенерировать новый пароль
+                                </button>
+                            </div>
+                            <div id="otpMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
+                        </div>
+
+                        <!-- Manual Custom 2FA Form Toggle -->
+                        <details style="margin-top: 1rem;">
+                            <summary style="font-size: 0.88rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                                ⚙️ Или установить свой постоянный пароль вручную
+                            </summary>
+                            <form id="custom2faForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                                <div style="flex: 1; min-width: 180px;">
+                                    <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Ваш произвольный пароль</label>
+                                    <input type="text" id="newCustom2faInput" name="new_password" class="form-control" placeholder="Любой ваш пароль" required>
+                                </div>
+                                <div style="flex: 1; min-width: 180px;">
+                                    <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль (если был)</label>
+                                    <input type="text" id="currentCustom2faInput" name="current_password" class="form-control" placeholder="Текущий пароль">
+                                </div>
+                                <button type="submit" class="btn btn-secondary" style="width: auto; padding: 11px 20px; font-size: 0.88rem;">
+                                    💾 Сохранить
+                                </button>
+                            </form>
+                            <div id="custom2faMsg" style="margin-top: 8px; font-size: 0.88rem;"></div>
+                        </details>
                     </div>
 
                     <!-- MTProto Authorization Banner -->

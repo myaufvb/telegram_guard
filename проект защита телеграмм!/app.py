@@ -449,17 +449,24 @@ async def generate_otp(
 
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите мониторинг Telegram на сайте"})
+        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите прямой мониторинг Telegram на сайте (кнопка ниже)"})
 
     # Generate a sleek 8-character random OTP password
     rand_chars = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
     new_otp = f"SHIELD-{rand_chars}"
 
     watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
-    res = await watchdog.update_2fa_password(new_password=new_otp, current_password=current_password)
+    curr_pwd = current_password.strip() if (current_password and current_password.strip()) else None
+    res = await watchdog.update_2fa_password(new_password=new_otp, current_password=curr_pwd)
 
     if not res.get("success"):
-        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error")})
+        err_msg = res.get("error", "")
+        if "password" in err_msg.lower():
+            err_msg = "Неверный текущий пароль Telegram. Укажите правильный текущий пароль."
+        return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
+
+    config.current_2fa_otp = new_otp
+    db.commit()
 
     active_otp_store[user.id] = {
         "code": new_otp,
@@ -470,16 +477,18 @@ async def generate_otp(
 
 @app.get("/api/2fa/current-otp")
 async def get_current_otp(
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    otp_info = active_otp_store.get(user.id)
-    if not otp_info:
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    otp_code = (config.current_2fa_otp if config else None) or active_otp_store.get(user.id, {}).get("code")
+    if not otp_code:
         return {"has_otp": False}
     
-    return {"has_otp": True, "otp_password": otp_info["code"], "generated_at": otp_info["generated_at"]}
+    return {"has_otp": True, "otp_password": otp_code}
 
 @app.post("/api/2fa/update-custom-password")
 async def update_custom_2fa_password(
@@ -493,18 +502,22 @@ async def update_custom_2fa_password(
 
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите мониторинг Telegram на сайте"})
+        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите прямой мониторинг Telegram на сайте"})
 
     if not new_password or len(new_password.strip()) < 4:
         return JSONResponse(status_code=400, content={"success": False, "error": "Пароль должен содержать минимум 4 символа"})
 
     watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
-    res = await watchdog.update_2fa_password(new_password=new_password.strip(), current_password=current_password.strip() if current_password else None)
+    curr_pwd = current_password.strip() if (current_password and current_password.strip()) else None
+    res = await watchdog.update_2fa_password(new_password=new_password.strip(), current_password=curr_pwd)
 
     if not res.get("success"):
         return JSONResponse(status_code=400, content={"success": False, "error": res.get("error")})
 
-    return {"success": True, "message": f"🔑 Облачный пароль Telegram успешно обновлен на '{new_password.strip()}'!"}
+    config.current_2fa_otp = new_password.strip()
+    db.commit()
+
+    return {"success": True, "message": "🔐 Облачный пароль успешно обновлен в вашем Telegram!"}
 
 @app.post("/api/update-settings")
 async def update_settings(

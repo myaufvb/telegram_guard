@@ -1,6 +1,6 @@
 import re
 import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Text, text
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 Base = declarative_base()
@@ -29,6 +29,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     phone_number = Column(String(30), unique=True, nullable=False, index=True)
+    email = Column(String(100), unique=True, nullable=True, index=True)
     password_hash = Column(String(255), nullable=False)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -56,6 +57,7 @@ class TelegramProtectionConfig(Base):
     api_id = Column(String(50), nullable=True)
     api_hash = Column(String(100), nullable=True)
     session_string = Column(Text, nullable=True)
+    current_2fa_otp = Column(String(50), nullable=True)
 
     user = relationship("User", back_populates="protection_config")
 
@@ -76,3 +78,14 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN current_2fa_otp VARCHAR(50)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(100)"))
+            conn.commit()
+        except Exception:
+            pass

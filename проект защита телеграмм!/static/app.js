@@ -344,30 +344,61 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/2fa/current-otp');
             const data = await res.json();
             const display = document.getElementById('otpCodeDisplay');
-            if (display && data.has_otp) {
+            if (display && data.has_otp && data.otp_password) {
                 display.textContent = data.otp_password;
             }
         } catch (e) {}
     };
 
+    window.copyOtpCode = function() {
+        const display = document.getElementById('otpCodeDisplay');
+        const btn = document.getElementById('copyOtpBtn');
+        if (display && display.textContent) {
+            const text = display.textContent.trim();
+            if (text && text !== 'НЕ СГЕНЕРИРОВАН') {
+                navigator.clipboard.writeText(text).then(() => {
+                    if (btn) {
+                        const orig = btn.textContent;
+                        btn.textContent = '✅ Скопировано!';
+                        setTimeout(() => { btn.textContent = orig; }, 2000);
+                    }
+                }).catch(() => {
+                    alert('Код: ' + text);
+                });
+            }
+        }
+    };
+
     window.generateNewOtp = async function() {
         const display = document.getElementById('otpCodeDisplay');
         const msg = document.getElementById('otpMsg');
+        const pwdInput = document.getElementById('otpCurrentPassword');
+        const currentPassword = pwdInput ? pwdInput.value.trim() : '';
+
         if (msg) {
-            msg.textContent = 'Генерация и связывание с Telegram...';
+            msg.textContent = '⏳ Генерация и привязка к вашему Telegram...';
             msg.style.color = 'var(--text-secondary)';
         }
 
+        const formData = new FormData();
+        if (currentPassword) {
+            formData.append('current_password', currentPassword);
+        }
+
         try {
-            const res = await fetch('/api/2fa/generate-otp', { method: 'POST' });
+            const res = await fetch('/api/2fa/generate-otp', {
+                method: 'POST',
+                body: formData
+            });
             const data = await res.json();
 
             if (data.success) {
                 if (display) display.textContent = data.otp_password;
                 if (msg) {
-                    msg.textContent = data.message || '✅ Успешно обновлено!';
+                    msg.textContent = data.message || '✅ Облачный пароль успешно привязан!';
                     msg.style.color = 'var(--accent-green)';
                 }
+                if (pwdInput) pwdInput.value = '';
             } else {
                 if (msg) {
                     msg.textContent = '❌ Ошибка: ' + (data.error || 'Не удалось привязать пароль');
@@ -381,6 +412,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+
+    // Auto-load OTP on page load if dashboard is open
+    if (document.getElementById('otpCodeDisplay')) {
+        window.loadCurrentOtp();
+    }
 
     // Custom 2FA Password Form Handler
     const custom2faForm = document.getElementById('custom2faForm');
