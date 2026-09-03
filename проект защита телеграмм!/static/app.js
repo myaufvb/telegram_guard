@@ -38,6 +38,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Auto-clean code inputs (strip spaces, dashes, letters)
+    ['verifyCodeInput', 'mtprotoCodeInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '');
+            });
+        }
+    });
+
     // Helper: Set error on field (RED border)
     function setFieldError(fieldId, errorMsg) {
         const field = document.getElementById(fieldId);
@@ -136,6 +146,9 @@ document.addEventListener('DOMContentLoaded', () => {
             field.classList.remove('is-invalid');
 
             const formData = new FormData(verifyCodeForm);
+            if (field) {
+                formData.set('code', field.value.replace(/\D/g, ''));
+            }
             try {
                 const response = await fetch('/api/verify-code', {
                     method: 'POST',
@@ -257,6 +270,10 @@ document.addEventListener('DOMContentLoaded', () => {
         mtprotoVerifyForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(mtprotoVerifyForm);
+            const codeInput = document.getElementById('mtprotoCodeInput');
+            if (codeInput) {
+                formData.set('code', codeInput.value.replace(/\D/g, ''));
+            }
 
             try {
                 const response = await fetch('/api/mtproto/verify-code', {
@@ -271,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     if (result.requires_2fa) {
                         document.getElementById('2faContainer').style.display = 'block';
-                        alert('Введите ваш облачный пароль (2FA) Telegram');
+                        alert(result.error || 'Введите ваш облачный пароль (2FA) Telegram');
                     } else {
                         alert('Ошибка: ' + (result.error || 'Неверный код'));
                     }

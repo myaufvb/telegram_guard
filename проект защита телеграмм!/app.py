@@ -122,7 +122,14 @@ async def register(
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    full_phone = f"{country_code}{phone_number}"
+    clean_phone = phone_number.strip()
+    if clean_phone.startswith("+"):
+        full_phone = clean_phone
+    elif clean_phone.startswith(country_code.replace("+", "")):
+        full_phone = f"+{clean_phone}"
+    else:
+        full_phone = f"{country_code}{clean_phone}"
+
     normalized = normalize_phone(full_phone)
 
     if not normalized or len(normalized) < 8:
@@ -131,7 +138,7 @@ async def register(
             content={"success": False, "error": "Некорректный номер телефона", "field": "phone_number"}
         )
 
-    existing_user = db.query(User).filter(User.username == username).first()
+    existing_user = db.query(User).filter(User.username == username.strip()).first()
     if existing_user:
         return JSONResponse(
             status_code=400,
@@ -145,7 +152,13 @@ async def register(
             content={"success": False, "error": "Аккаунт с таким номером телефона уже зарегистрирован", "field": "phone_number"}
         )
 
-    expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+    # Clean up any stale unverified requests for this phone
+    db.query(PendingAuth).filter(
+        PendingAuth.phone_number == normalized,
+        PendingAuth.is_verified == False
+    ).delete()
+
+    expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
     pending = PendingAuth(
         phone_number=normalized,
         verify_code="",
@@ -260,46 +273,83 @@ async def verify_dev_login(
 async def verify_code(
     phone_number: str = Form(...),
     code: str = Form(...),
-    username: str = Form(...),
-    password: str = Form(...),
+    username: str = Form(""),
+    password: str = Form(""),
     response: Response = None,
     db: Session = Depends(get_db)
 ):
-    normalized = normalize_phone(phone_number)
-    clean_code = code.strip()
+    clean_code = re.sub(r'\D', '', str(code).strip())
+    if not clean_code:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Пожалуйста, введите код из бота", "field": "code"}
+        )
 
-    pending = db.query(PendingAuth).filter(
-        PendingAuth.phone_number == normalized,
-        PendingAuth.verify_code == clean_code
-    ).order_by(PendingAuth.id.desc()).first()
+    normalized = normalize_phone(phone_number)
+    now = datetime.datetime.utcnow()
+
+    # Search for pending auth
+    pending = None
+    if normalized:
+        pending = db.query(PendingAuth).filter(
+            PendingAuth.phone_number == normalized,
+            PendingAuth.verify_code == clean_code
+        ).order_by(PendingAuth.id.desc()).first()
+
+    if not pending and normalized and len(normalized) >= 9:
+        last9 = normalized[-9:]
+        pending = db.query(PendingAuth).filter(
+            PendingAuth.phone_number.endswith(last9),
+            PendingAuth.verify_code == clean_code
+        ).order_by(PendingAuth.id.desc()).first()
 
     if not pending:
+        # Fallback: search by code issued within the last 30 minutes
+        thirty_mins_ago = now - datetime.timedelta(minutes=30)
         pending = db.query(PendingAuth).filter(
-            PendingAuth.verify_code == clean_code
+            PendingAuth.verify_code == clean_code,
+            PendingAuth.created_at >= thirty_mins_ago
         ).order_by(PendingAuth.id.desc()).first()
 
     if not pending:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "error": "Неверный код из бота. Нажмите 'Поделиться контактом' еще раз", "field": "code"}
+            content={"success": False, "error": "Неверный код из бота. Нажмите 'Поделиться контактом' еще раз в боте", "field": "code"}
         )
 
     pending.is_verified = True
+    actual_phone = pending.phone_number or normalized
 
-    user = db.query(User).filter(User.phone_number == normalized).first()
+    user = db.query(User).filter(User.phone_number == actual_phone).first()
+    if not user and normalized:
+        user = db.query(User).filter(User.phone_number == normalized).first()
+
     if not user:
+        clean_user = username.strip() if (username and username.strip()) else f"user_{actual_phone[-4:]}"
+        if db.query(User).filter(User.username == clean_user).first():
+            clean_user = f"{clean_user}_{random.randint(100, 999)}"
+
         user = User(
-            username=username.strip() if (username and username.strip()) else f"user_{normalized[-4:]}",
-            phone_number=normalized,
+            username=clean_user,
+            phone_number=actual_phone,
             password_hash=hash_password(password) if (password and password.strip()) else hash_password("2010090900"),
             is_verified=True
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except Exception:
+            db.rollback()
+            user.username = f"user_{actual_phone[-6:]}_{random.randint(1000, 9999)}"
+            db.add(user)
+            db.commit()
+            db.refresh(user)
 
         config = TelegramProtectionConfig(user_id=user.id, device_limit=2, auto_kill_enabled=True)
         db.add(config)
+        db.commit()
+    else:
         db.commit()
 
     res = JSONResponse(content={"success": True, "redirect": "/dashboard"})
@@ -346,18 +396,22 @@ async def mtproto_verify_code(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    pending_data = mtproto_pending_auths.get(user.id)
-    if not pending_data:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала запросите код авторизации"})
+    clean_code = re.sub(r'\D', '', str(code).strip())
+    if not clean_code:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Пожалуйста, введите код из сообщения Telegram"})
+
+    pending_data = mtproto_pending_auths.get(user.id, {})
+    phone_code_hash = pending_data.get("phone_code_hash")
+    session_string = pending_data.get("session_string")
 
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     watchdog = SessionWatchdog(api_id=config.api_id if config else None, api_hash=config.api_hash if config else None)
 
     res = await watchdog.complete_login(
         phone=user.phone_number,
-        code=code.strip(),
-        phone_code_hash=pending_data["phone_code_hash"],
-        session_string=pending_data["session_string"],
+        code=clean_code,
+        phone_code_hash=phone_code_hash,
+        session_string=session_string,
         password=password
     )
 

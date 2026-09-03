@@ -3,10 +3,15 @@ import asyncio
 import random
 import string
 import logging
+import re
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.account import GetAuthorizationsRequest, ResetAuthorizationRequest
-from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, ApiIdInvalidError, FreshResetAuthorisationForbiddenError
+from telethon.errors import (
+    SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError,
+    PasswordHashInvalidError, ApiIdInvalidError, FreshResetAuthorisationForbiddenError,
+    FloodWaitError
+)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -18,6 +23,10 @@ DEVICE_MODEL = "Telegram Desktop"
 SYSTEM_VERSION = "Windows 10"
 APP_VERSION = "4.16.8 x64"
 LANG_CODE = "en"
+
+# Cache of actively connected clients during authorization flow:
+# phone -> {"client": TelegramClient, "phone_code_hash": str, "session_string": str}
+_active_auth_clients = {}
 
 class SessionWatchdog:
     def __init__(self, api_id = None, api_hash: str = None, session_string: str = None):
@@ -72,12 +81,30 @@ class SessionWatchdog:
             return {"success": False, "error": str(e)}
 
     async def send_login_code(self, phone: str):
+        # Disconnect any old pending client for this phone
+        if phone in _active_auth_clients:
+            old_entry = _active_auth_clients.pop(phone, None)
+            if old_entry and old_entry.get("client"):
+                try:
+                    await old_entry["client"].disconnect()
+                except Exception:
+                    pass
+
         client = self._create_client()
         try:
             await client.connect()
             res = await client.send_code_request(phone)
             saved_session = client.session.save()
-            await client.disconnect()
+            
+            # Keep client connected! Telegram invalidates code if client disconnects before sign_in
+            _active_auth_clients[phone] = {
+                "client": client,
+                "phone_code_hash": res.phone_code_hash,
+                "session_string": saved_session,
+                "api_id": self.api_id,
+                "api_hash": self.api_hash
+            }
+
             return {
                 "success": True,
                 "phone_code_hash": res.phone_code_hash,
@@ -87,30 +114,64 @@ class SessionWatchdog:
             }
         except Exception as e:
             logging.error(f"Error sending MTProto code: {e}")
-            await client.disconnect()
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
             return {"success": False, "error": str(e)}
 
-    async def complete_login(self, phone: str, code: str, phone_code_hash: str, session_string: str, password: str = None):
-        client = self._create_client(session_string)
-        await client.connect()
+    async def complete_login(self, phone: str, code: str, phone_code_hash: str, session_string: str = None, password: str = None):
+        clean_code = re.sub(r'\D', '', str(code))
+        if not clean_code:
+            return {"success": False, "error": "Пожалуйста, введите код из сообщения Telegram"}
+
+        # Use existing actively connected client if available to prevent PhoneCodeInvalidError
+        auth_entry = _active_auth_clients.get(phone)
+        client = None
+        if auth_entry and auth_entry.get("client"):
+            client = auth_entry["client"]
+            if not phone_code_hash:
+                phone_code_hash = auth_entry.get("phone_code_hash")
+
+        if client is None or not client.is_connected():
+            sess_str = session_string or (auth_entry.get("session_string") if auth_entry else None)
+            client = self._create_client(sess_str)
+            await client.connect()
+
         try:
             try:
-                await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
+                await client.sign_in(phone=phone, code=clean_code, phone_code_hash=phone_code_hash)
             except SessionPasswordNeededError:
                 if not password:
-                    await client.disconnect()
+                    # Keep client connected so user can provide 2FA cloud password next
                     return {"success": False, "requires_2fa": True, "error": "Требуется облачный пароль (2FA)"}
-                await client.sign_in(password=password)
+                await client.sign_in(password=password.strip())
 
             final_session = client.session.save()
-            await client.disconnect()
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            _active_auth_clients.pop(phone, None)
             return {
                 "success": True,
                 "session_string": final_session
             }
+        except PhoneCodeInvalidError:
+            return {"success": False, "error": "Неверный код из Telegram. Проверьте правильность введенных цифр"}
+        except PhoneCodeExpiredError:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            _active_auth_clients.pop(phone, None)
+            return {"success": False, "error": "Срок действия кода истек. Запросите новый код"}
+        except PasswordHashInvalidError:
+            return {"success": False, "requires_2fa": True, "error": "Неверный облачный пароль (2FA). Попробуйте еще раз"}
+        except FloodWaitError as e:
+            return {"success": False, "error": f"Слишком много попыток. Подождите {e.seconds} секунд"}
         except Exception as e:
             logging.error(f"Error completing MTProto login: {e}")
-            await client.disconnect()
             return {"success": False, "error": str(e)}
 
     async def get_active_sessions(self):

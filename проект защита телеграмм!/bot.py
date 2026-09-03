@@ -52,6 +52,24 @@ async def handle_contact(message: types.Message):
             PendingAuth.is_verified == False
         ).order_by(PendingAuth.id.desc()).first()
 
+        # Fallback: Match by last 9 digits in case of prefix differences (+998, 8, 7, etc.)
+        if not pending and len(normalized_phone) >= 9:
+            last9 = normalized_phone[-9:]
+            pending = db.query(PendingAuth).filter(
+                PendingAuth.phone_number.endswith(last9),
+                PendingAuth.expires_at > now,
+                PendingAuth.is_verified == False
+            ).order_by(PendingAuth.id.desc()).first()
+
+        # Second fallback: allow matching if created in the last 1 hour
+        if not pending:
+            one_hour_ago = now - datetime.timedelta(hours=1)
+            pending = db.query(PendingAuth).filter(
+                PendingAuth.phone_number == normalized_phone,
+                PendingAuth.created_at >= one_hour_ago,
+                PendingAuth.is_verified == False
+            ).order_by(PendingAuth.id.desc()).first()
+
         if not pending:
             await message.answer(
                 f"⚠️ **Номер телефона не найден в ожидающих запросах на сайте**\n\n"
@@ -65,13 +83,15 @@ async def handle_contact(message: types.Message):
         verify_code = str(random.randint(100000, 999999))
         pending.verify_code = verify_code
         pending.telegram_id = telegram_id
+        pending.expires_at = now + datetime.timedelta(minutes=30)
         db.commit()
 
         success_msg = (
             f"✅ **Номер успешно подтвержден!**\n\n"
             f"🔑 Ваш код авторизации на сайте Telegram Guard:\n\n"
             f"`{verify_code}`\n\n"
-            f"Скопируйте код выше и введите его в форме на сайте."
+            f"*(Нажмите на код выше, чтобы скопировать)*\n"
+            f"Введите этот 6-значный код в форме на сайте."
         )
         await message.answer(success_msg, parse_mode=ParseMode.MARKDOWN)
 
