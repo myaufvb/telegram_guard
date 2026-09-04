@@ -18,8 +18,8 @@
         <div class="auth-wrapper">
             <div class="card">
                 <div class="tabs-header">
-                    <button class="tab-btn auth-tab-btn active" data-tab="login">Войти</button>
-                    <button class="tab-btn auth-tab-btn" data-tab="register">Регистрация</button>
+                    <button type="button" class="tab-btn auth-tab-btn active" data-tab="login" onclick="switchAuthTab('login')">Войти</button>
+                    <button type="button" class="tab-btn auth-tab-btn" data-tab="register" onclick="switchAuthTab('register')">Регистрация</button>
                 </div>
 
                 <!-- Form: Login -->
@@ -52,7 +52,9 @@
                         <div class="error-text"></div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Войти в систему</button>
+                    <div id="loginAlertMsg" style="margin-bottom: 12px; font-size: 0.9rem; color: var(--accent-red); display: none;"></div>
+
+                    <button type="submit" id="loginSubmitBtn" class="btn btn-primary">Войти в систему</button>
 
                     <div style="margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center;">
                         <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 6px;">
@@ -96,11 +98,13 @@
 
                     <div class="form-group">
                         <label for="regPassword">Пароль</label>
-                        <input type="password" id="regPassword" name="password" class="form-control" placeholder="Придумайте пароль" required>
+                        <input type="password" id="regPassword" name="password" class="form-control" placeholder="Придумайте пароль (мин. 4 символа)" required>
                         <div class="error-text"></div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Получить код в Telegram</button>
+                    <div id="registerAlertMsg" style="margin-bottom: 12px; font-size: 0.9rem; color: var(--accent-red); display: none;"></div>
+
+                    <button type="submit" id="registerSubmitBtn" class="btn btn-primary">Зарегистрироваться</button>
 
                     <div style="margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center;">
                         <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 6px;">
@@ -157,6 +161,6 @@
         .auth-form { display: none !important; }
         .auth-form.active { display: block !important; }
     </style>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=6"></script>
 </body>
 </html>

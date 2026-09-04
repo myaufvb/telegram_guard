@@ -1,23 +1,44 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Tab switching for index.html (Login / Register)
+// Global Tab Switching function accessible from HTML onclick
+window.switchAuthTab = function(tabName) {
     const tabBtns = document.querySelectorAll('.auth-tab-btn');
     const authForms = document.querySelectorAll('.auth-form');
 
     tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetTab = btn.dataset.tab;
-            tabBtns.forEach(b => b.classList.remove('active'));
-            authForms.forEach(f => f.classList.remove('active'));
-            
+        if (btn.dataset.tab === tabName) {
             btn.classList.add('active');
-            const targetForm = document.getElementById(`${targetTab}Form`);
-            if (targetForm) targetForm.classList.add('active');
-            clearErrors();
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    authForms.forEach(form => {
+        if (form.id === `${tabName}Form`) {
+            form.classList.add('active');
+            form.style.display = 'block';
+        } else {
+            form.classList.remove('active');
+            form.style.display = 'none';
+        }
+    });
+
+    if (typeof window.clearAuthErrors === 'function') {
+        window.clearAuthErrors();
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Tab switching event listeners
+    const tabBtns = document.querySelectorAll('.auth-tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if (e) e.preventDefault();
+            const targetTab = btn.dataset.tab;
+            window.switchAuthTab(targetTab);
         });
     });
 
     // Helper: Clear invalid error highlights
-    function clearErrors() {
+    window.clearAuthErrors = function() {
         document.querySelectorAll('.form-control, .country-select').forEach(el => {
             el.classList.remove('is-invalid');
         });
@@ -25,6 +46,20 @@ document.addEventListener('DOMContentLoaded', () => {
             el.classList.remove('visible');
             el.textContent = '';
         });
+        const loginAlert = document.getElementById('loginAlertMsg');
+        if (loginAlert) {
+            loginAlert.style.display = 'none';
+            loginAlert.textContent = '';
+        }
+        const regAlert = document.getElementById('registerAlertMsg');
+        if (regAlert) {
+            regAlert.style.display = 'none';
+            regAlert.textContent = '';
+        }
+    };
+
+    function clearErrors() {
+        window.clearAuthErrors();
     }
 
     // Clear error state on input change
@@ -48,9 +83,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Helper: Set error on field (RED border)
-    function setFieldError(fieldId, errorMsg) {
-        const field = document.getElementById(fieldId);
+    // Helper: Set error on field with automatic ID mapping
+    function setFieldError(fieldId, errorMsg, formType = 'login') {
+        let field = document.getElementById(fieldId);
+        if (!field) {
+            if (fieldId === 'phone_number') {
+                field = document.getElementById(formType === 'login' ? 'loginPhone' : 'regPhone');
+            } else if (fieldId === 'password') {
+                field = document.getElementById(formType === 'login' ? 'loginPassword' : 'regPassword');
+            } else if (fieldId === 'username') {
+                field = document.getElementById('regUsername');
+            } else if (fieldId === 'code') {
+                field = document.getElementById('verifyCodeInput');
+            }
+        }
         if (field) {
             field.classList.add('is-invalid');
             let errEl = field.parentElement.querySelector('.error-text');
@@ -71,6 +117,13 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             clearErrors();
 
+            const submitBtn = document.getElementById('loginSubmitBtn');
+            const alertMsg = document.getElementById('loginAlertMsg');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Вход в систему...';
+            }
+
             const formData = new FormData(loginForm);
             try {
                 const response = await fetch('/api/login', {
@@ -80,23 +133,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await response.json();
 
                 if (result.success) {
-                    if (result.requires_2fa) {
-                        // Show 2FA Developer verification modal
-                        document.getElementById('verifyPhoneHidden').value = result.phone_number;
-                        const modal = document.getElementById('verifyModal');
-                        if (modal) modal.classList.add('active');
-                    } else {
-                        window.location.href = result.redirect || '/dashboard';
-                    }
+                    if (submitBtn) submitBtn.textContent = '✅ Успешно!';
+                    window.location.href = result.redirect || '/dashboard';
                 } else {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Войти в систему';
+                    }
+                    if (alertMsg) {
+                        alertMsg.textContent = '❌ ' + (result.error || 'Ошибка входа');
+                        alertMsg.style.display = 'block';
+                    }
                     if (result.field) {
-                        setFieldError(result.field, result.error);
+                        setFieldError(result.field, result.error, 'login');
                     } else {
-                        setFieldError('loginPhone', result.error || 'Ошибка входа');
+                        setFieldError('loginPhone', result.error || 'Ошибка входа', 'login');
                     }
                 }
             } catch (err) {
-                setFieldError('loginPhone', 'Ошибка соединения с сервером');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Войти в систему';
+                }
+                if (alertMsg) {
+                    alertMsg.textContent = '❌ Ошибка соединения с сервером';
+                    alertMsg.style.display = 'block';
+                }
+                setFieldError('loginPhone', 'Ошибка соединения с сервером', 'login');
             }
         });
     }
@@ -108,6 +171,13 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             clearErrors();
 
+            const submitBtn = document.getElementById('registerSubmitBtn');
+            const alertMsg = document.getElementById('registerAlertMsg');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Регистрация...';
+            }
+
             const formData = new FormData(registerForm);
             try {
                 const response = await fetch('/api/register', {
@@ -117,22 +187,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await response.json();
 
                 if (result.success) {
-                    // Open Telegram Verification Modal
-                    document.getElementById('verifyPhoneHidden').value = result.phone_number;
-                    document.getElementById('verifyUsernameHidden').value = formData.get('username');
-                    document.getElementById('verifyPasswordHidden').value = formData.get('password');
-                    
-                    const modal = document.getElementById('verifyModal');
-                    if (modal) modal.classList.add('active');
+                    if (submitBtn) submitBtn.textContent = '✅ Зарегистрировано!';
+                    window.location.href = result.redirect || '/dashboard';
                 } else {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Зарегистрироваться';
+                    }
+                    if (alertMsg) {
+                        alertMsg.textContent = '❌ ' + (result.error || 'Ошибка регистрации');
+                        alertMsg.style.display = 'block';
+                    }
                     if (result.field) {
-                        setFieldError(result.field, result.error);
+                        setFieldError(result.field, result.error, 'register');
                     } else {
-                        setFieldError('regPhone', result.error || 'Ошибка регистрации');
+                        setFieldError('regPhone', result.error || 'Ошибка регистрации', 'register');
                     }
                 }
             } catch (err) {
-                setFieldError('regPhone', 'Ошибка соединения с сервером');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Зарегистрироваться';
+                }
+                if (alertMsg) {
+                    alertMsg.textContent = '❌ Ошибка соединения с сервером';
+                    alertMsg.style.display = 'block';
+                }
+                setFieldError('regPhone', 'Ошибка соединения с сервером', 'register');
             }
         });
     }

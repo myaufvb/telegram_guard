@@ -134,6 +134,8 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
         "all_users": all_users
     })
 
+DEV_ADMIN_PHONE = "+998334906969"
+
 # API Routes
 @app.post("/api/register")
 async def register(
@@ -159,7 +161,20 @@ async def register(
             content={"success": False, "error": "Некорректный номер телефона", "field": "phone_number"}
         )
 
-    existing_user = db.query(User).filter(User.username == username.strip()).first()
+    clean_user = username.strip()
+    if len(clean_user) < 2:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Имя пользователя должно быть не менее 2 символов", "field": "username"}
+        )
+
+    if not password or len(password.strip()) < 4:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Пароль должен содержать минимум 4 символа", "field": "password"}
+        )
+
+    existing_user = db.query(User).filter(User.username == clean_user).first()
     if existing_user:
         return JSONResponse(
             status_code=400,
@@ -170,32 +185,34 @@ async def register(
     if existing_phone:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "error": "Аккаунт с таким номером телефона уже зарегистрирован", "field": "phone_number"}
+            content={"success": False, "error": "Аккаунт с таким номером уже зарегистрирован. Перейдите на вкладку «Войти»", "field": "phone_number"}
         )
 
-    # Clean up any stale unverified requests for this phone
-    db.query(PendingAuth).filter(
-        PendingAuth.phone_number == normalized,
-        PendingAuth.is_verified == False
-    ).delete()
-
-    expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
-    pending = PendingAuth(
+    is_dev = (normalized == DEV_ADMIN_PHONE)
+    new_user = User(
+        username=clean_user,
         phone_number=normalized,
-        verify_code="",
-        is_verified=False,
-        expires_at=expires_at
+        password_hash=hash_password(password.strip()),
+        role="developer" if is_dev else "client",
+        is_verified=True
     )
-    db.add(pending)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    config = TelegramProtectionConfig(
+        user_id=new_user.id,
+        device_limit=2,
+        auto_kill_enabled=True,
+        api_id="30893799",
+        api_hash="104e933f456c9caee9c3645e9dfc2421"
+    )
+    db.add(config)
     db.commit()
 
-    return {
-        "success": True,
-        "bot_url": "https://t.me/Defense_telegram_lerman_bot",
-        "phone_number": normalized
-    }
-
-DEV_ADMIN_PHONE = "+998334906969"
+    res = JSONResponse(content={"success": True, "redirect": "/dashboard"})
+    res.set_cookie(key="user_id", value=str(new_user.id), httponly=True, max_age=86400*7)
+    return res
 
 @app.post("/api/login")
 async def login(
@@ -220,10 +237,33 @@ async def login(
         normalized = normalize_phone(full_phone)
         user = db.query(User).filter(User.phone_number == normalized).first()
 
+    # Developer account auto-provisioning if fresh database
+    if not user and (normalized == DEV_ADMIN_PHONE):
+        user = User(
+            username="мухаммад",
+            phone_number=DEV_ADMIN_PHONE,
+            password_hash=hash_password(password),
+            role="developer",
+            is_verified=True
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        config = TelegramProtectionConfig(
+            user_id=user.id,
+            device_limit=2,
+            auto_kill_enabled=True,
+            api_id="30893799",
+            api_hash="104e933f456c9caee9c3645e9dfc2421"
+        )
+        db.add(config)
+        db.commit()
+
     if not user:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "error": "Аккаунт не найден", "field": "phone_number"}
+            content={"success": False, "error": "Аккаунт не найден. Пожалуйста, зарегистрируйтесь", "field": "phone_number"}
         )
 
     # Auto-sync developer password
@@ -236,29 +276,6 @@ async def login(
             status_code=400,
             content={"success": False, "error": "Неверный пароль", "field": "password"}
         )
-
-    # 2FA Security Check for Developer Account
-    if normalized == DEV_ADMIN_PHONE or user.phone_number == DEV_ADMIN_PHONE:
-        code = str(random.randint(100000, 999999))
-        expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
-        
-        db.query(PendingAuth).filter(PendingAuth.phone_number == normalized).delete()
-        pending = PendingAuth(
-            phone_number=normalized,
-            verify_code=code,
-            expires_at=expires_at,
-            is_verified=False
-        )
-        db.add(pending)
-        db.commit()
-
-        return {
-            "success": True,
-            "requires_2fa": True,
-            "phone_number": normalized,
-            "bot_url": "https://t.me/Defense_telegram_lerman_bot",
-            "message": "🔒 Требуется 6-значный код безопасности из бота Telegram"
-        }
 
     res = JSONResponse(content={"success": True, "redirect": "/dashboard"})
     res.set_cookie(key="user_id", value=str(user.id), httponly=True, max_age=86400*7)
