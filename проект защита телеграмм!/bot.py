@@ -70,28 +70,30 @@ async def handle_contact(message: types.Message):
                 PendingAuth.is_verified == False
             ).order_by(PendingAuth.id.desc()).first()
 
-        if not pending:
-            await message.answer(
-                f"⚠️ **Номер телефона не найден в ожидающих запросах на сайте**\n\n"
-                f"Вы передали номер: `{normalized_phone}`\n"
-                f"Пожалуйста, убедитесь, что вы указали этот же номер на сайте перед нажатием кнопки в боте.",
-                parse_mode=ParseMode.MARKDOWN
-            )
-            return
-
-        # Generate 6-digit code
         verify_code = str(random.randint(100000, 999999))
-        pending.verify_code = verify_code
-        pending.telegram_id = telegram_id
-        pending.expires_at = now + datetime.timedelta(minutes=30)
+        if not pending:
+            pending = PendingAuth(
+                phone_number=normalized_phone,
+                verify_code=verify_code,
+                telegram_id=telegram_id,
+                is_verified=False,
+                created_at=now,
+                expires_at=now + datetime.timedelta(minutes=30)
+            )
+            db.add(pending)
+        else:
+            pending.verify_code = verify_code
+            pending.telegram_id = telegram_id
+            pending.expires_at = now + datetime.timedelta(minutes=30)
+            pending.is_verified = False
         db.commit()
 
         success_msg = (
             f"✅ **Номер успешно подтвержден!**\n\n"
             f"🔑 Ваш код авторизации на сайте Telegram Guard:\n\n"
             f"`{verify_code}`\n\n"
-            f"*(Нажмите на код выше, чтобы скопировать)*\n"
-            f"Введите этот 6-значный код в форме на сайте."
+            f"*(Нажмите на код выше, чтобы скопировать)*\n\n"
+            f"Введите этот 6-значный код на сайте для входа или подтверждения аккаунта."
         )
         await message.answer(success_msg, parse_mode=ParseMode.MARKDOWN)
 
@@ -100,6 +102,21 @@ async def handle_contact(message: types.Message):
         await message.answer("❌ Произошла ошибка при обработке запроса. Попробуйте еще раз.")
     finally:
         db.close()
+
+@dp.message()
+async def any_text_cmd(message: types.Message):
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📱 Поделиться контактом", request_contact=True)]
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+    text = (
+        "🔐 **Получение кода входа Telegram Guard**\n\n"
+        "Нажмите кнопку **«📱 Поделиться контактом»** ниже, чтобы мгновенно получить 6-значный проверочный код для сайта."
+    )
+    await message.answer(text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
 
 if __name__ == "__main__":
     import asyncio

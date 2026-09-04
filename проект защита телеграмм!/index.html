@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Telegram Guard — Система защиты аккаунта</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="brand">
+            <span class="brand-icon">🛡️</span>
+            <span>Telegram Guard</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="auth-wrapper">
+            <div class="card">
+                <div class="tabs-header">
+                    <button type="button" class="tab-btn auth-tab-btn active" data-tab="login" onclick="switchAuthTab('login')">Войти</button>
+                    <button type="button" class="tab-btn auth-tab-btn" data-tab="register" onclick="switchAuthTab('register')">Регистрация</button>
+                </div>
+
+                <!-- Form: Login -->
+                <form id="loginForm" class="auth-form active">
+                    <h2 style="margin-bottom: 1rem; font-size: 1.3rem;">Вход в аккаунт</h2>
+                    <div class="form-group">
+                        <label for="loginPhone">Номер телефона, Логин или Email</label>
+                        <div class="phone-input-group">
+                            <select name="country_code" class="country-select" id="loginCountrySelect">
+                                <option value="+998" selected>🇺🇿 +998</option>
+                                <option value="+7">🇷🇺/🇰🇿 +7</option>
+                                <option value="+380">🇺🇦 +380</option>
+                                <option value="+375">🇧🇾 +375</option>
+                                <option value="+994">🇦🇿 +994</option>
+                                <option value="+995">🇬🇪 +995</option>
+                                <option value="+90">🇹🇷 +90</option>
+                                <option value="+1">🇺🇸 +1</option>
+                                <option value="+992">🇹🇯 +992</option>
+                                <option value="+996">🇰🇬 +996</option>
+                                <option value="+374">🇦🇲 +374</option>
+                            </select>
+                            <input type="text" id="loginPhone" name="phone_number" class="form-control" placeholder="shaxsmart или 901234567" required>
+                        </div>
+                        <div class="error-text"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Пароль</label>
+                        <input type="password" id="loginPassword" name="password" class="form-control" placeholder="••••••••" required>
+                        <div class="error-text"></div>
+                    </div>
+
+                    <div id="loginAlertMsg" style="margin-bottom: 12px; font-size: 0.9rem; color: var(--accent-red); display: none;"></div>
+
+                    <button type="submit" id="loginSubmitBtn" class="btn btn-primary">Войти в систему</button>
+
+                    <button type="button" id="openVerifyModalBtn" class="btn btn-secondary" style="margin-top: 10px; width: 100%; border: 1px solid rgba(0, 240, 255, 0.4); color: var(--accent-cyan); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>⚡</span> Войти по коду из Telegram-бота
+                    </button>
+
+                    <div style="margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center;">
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 6px;">
+                            Не можете войти или забыли облачный пароль?
+                        </p>
+                        <a href="https://t.me/Sir_lerman" target="_blank" style="color: var(--accent-cyan); font-weight: 700; font-size: 0.88rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🆘</span> Техподдержка: @Sir_lerman
+                        </a>
+                    </div>
+                </form>
+
+                <!-- Form: Register -->
+                <form id="registerForm" class="auth-form">
+                    <h2 style="margin-bottom: 1rem; font-size: 1.3rem;">Регистрация защиты</h2>
+                    <div class="form-group">
+                        <label for="regUsername">Имя пользователя (Логин)</label>
+                        <input type="text" id="regUsername" name="username" class="form-control" placeholder="alex_shield" required>
+                        <div class="error-text"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regPhone">Номер телефона</label>
+                        <div class="phone-input-group">
+                            <select name="country_code" class="country-select">
+                                <option value="+998" selected>🇺🇿 +998</option>
+                                <option value="+7">🇷🇺/🇰🇿 +7</option>
+                                <option value="+380">🇺🇦 +380</option>
+                                <option value="+375">🇧🇾 +375</option>
+                                <option value="+994">🇦🇿 +994</option>
+                                <option value="+995">🇬🇪 +995</option>
+                                <option value="+90">🇹🇷 +90</option>
+                                <option value="+1">🇺🇸 +1</option>
+                                <option value="+992">🇹🇯 +992</option>
+                                <option value="+996">🇰🇬 +996</option>
+                                <option value="+374">🇦🇲 +374</option>
+                            </select>
+                            <input type="text" id="regPhone" name="phone_number" class="form-control" placeholder="901234567" required>
+                        </div>
+                        <div class="error-text"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regPassword">Пароль</label>
+                        <input type="password" id="regPassword" name="password" class="form-control" placeholder="Придумайте пароль (мин. 4 символа)" required>
+                        <div class="error-text"></div>
+                    </div>
+
+                    <div id="registerAlertMsg" style="margin-bottom: 12px; font-size: 0.9rem; color: var(--accent-red); display: none;"></div>
+
+                    <button type="submit" id="registerSubmitBtn" class="btn btn-primary">Зарегистрироваться</button>
+
+                    <div style="margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center;">
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 6px;">
+                            Возникли вопросы или нужна помощь с регистрацией?
+                        </p>
+                        <a href="https://t.me/Sir_lerman" target="_blank" style="color: var(--accent-cyan); font-weight: 700; font-size: 0.88rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🆘</span> Техподдержка: @Sir_lerman
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Verification Code -->
+    <div id="verifyModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 0.8rem;">Вход / Подтверждение по коду</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.2rem; line-height: 1.4;">
+                1. Откройте наш бот в Telegram.<br>
+                2. Нажмите кнопку <strong>«📱 Поделиться контактом»</strong> внизу.<br>
+                3. Скопируйте 6-значный код и вставьте его сюда:
+            </p>
+
+            <a href="https://t.me/Defense_telegram_lerman_bot" target="_blank" class="btn btn-telegram" style="margin-bottom: 1.2rem;">
+                ✈️ Открыть бота @Defense_telegram_lerman_bot
+            </a>
+
+            <form id="verifyCodeForm">
+                <input type="hidden" id="verifyPhoneHidden" name="phone_number">
+                <input type="hidden" id="verifyUsernameHidden" name="username">
+                <input type="hidden" id="verifyPasswordHidden" name="password">
+
+                <div class="form-group">
+                    <label for="verifyCodeInput">6-значный проверочный код</label>
+                    <input type="text" id="verifyCodeInput" name="code" class="form-control code-input" placeholder="123456" maxlength="12" autocomplete="one-time-code" required style="font-size: 1.4rem; letter-spacing: 4px; text-align: center;">
+                    <div class="error-text"></div>
+                </div>
+
+                <div id="verifyAlertMsg" style="margin-bottom: 10px; font-size: 0.9rem; color: var(--accent-red); display: none;"></div>
+
+                <button type="submit" id="verifySubmitBtn" class="btn btn-primary" style="margin-top: 0.5rem;">Войти в систему</button>
+                <button type="button" id="closeModalBtn" class="btn btn-secondary" style="margin-top: 0.5rem;">Отмена</button>
+
+                <div style="margin-top: 1.2rem; padding-top: 0.8rem; border-top: 1px solid var(--border-color); text-align: center;">
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;">
+                        Не приходит код или не получается войти?
+                    </p>
+                    <a href="https://t.me/Sir_lerman" target="_blank" style="color: var(--accent-cyan); font-weight: 700; font-size: 0.85rem; text-decoration: none;">
+                        🆘 Техподдержка: @Sir_lerman
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .auth-form { display: none !important; }
+        .auth-form.active { display: block !important; }
+    </style>
+    <script src="/static/app.js?v=6"></script>
+</body>
+</html>
