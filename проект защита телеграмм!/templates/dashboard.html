@@ -449,7 +449,9 @@
                     <input type="password" id="mtproto2faInput" name="password" class="form-control" placeholder="Ваш пароль 2FA">
                 </div>
 
-                <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">Активировать защиту</button>
+                <div id="mtprotoVerifyErrorMsg" style="margin-top: 10px; font-size: 0.88rem; color: var(--accent-red); display: none;"></div>
+
+                <button type="submit" id="mtprotoVerifySubmitBtn" class="btn btn-primary" style="margin-top: 1rem;">Активировать защиту</button>
                 <button type="button" id="closeMtprotoModalBtn" class="btn btn-secondary" style="margin-top: 0.5rem;">Отмена</button>
             </form>
         </div>

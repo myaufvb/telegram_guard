@@ -269,6 +269,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mtprotoVerifyForm) {
         mtprotoVerifyForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const errEl = document.getElementById('mtprotoVerifyErrorMsg');
+            const submitBtn = document.getElementById('mtprotoVerifySubmitBtn');
+            if (errEl) {
+                errEl.style.display = 'none';
+                errEl.textContent = '';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Проверка кода...';
+            }
+
             const formData = new FormData(mtprotoVerifyForm);
             const codeInput = document.getElementById('mtprotoCodeInput');
             if (codeInput) {
@@ -283,18 +294,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await response.json();
 
                 if (result.success) {
+                    if (submitBtn) submitBtn.textContent = '✅ Подключено!';
                     alert('🛡️ Авто-кик 3-го устройства успешно активирован!');
                     window.location.reload();
                 } else {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Активировать защиту';
+                    }
                     if (result.requires_2fa) {
-                        document.getElementById('2faContainer').style.display = 'block';
-                        alert(result.error || 'Введите ваш облачный пароль (2FA) Telegram');
+                        const container2fa = document.getElementById('2faContainer');
+                        if (container2fa) container2fa.style.display = 'block';
+                        const pwdInput = document.getElementById('mtproto2faInput');
+                        if (pwdInput) pwdInput.focus();
+                        if (errEl) {
+                            errEl.textContent = '🔒 ' + (result.error || 'Требуется облачный пароль Telegram (2FA)');
+                            errEl.style.display = 'block';
+                        }
                     } else {
-                        alert('Ошибка: ' + (result.error || 'Неверный код'));
+                        if (errEl) {
+                            errEl.textContent = '❌ ' + (result.error || 'Неверный код из Telegram');
+                            errEl.style.display = 'block';
+                        } else {
+                            alert('Ошибка: ' + (result.error || 'Неверный код'));
+                        }
                     }
                 }
             } catch (err) {
-                alert('Ошибка соединения с сервером');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Активировать защиту';
+                }
+                if (errEl) {
+                    errEl.textContent = '❌ Ошибка соединения с сервером. Попробуйте еще раз.';
+                    errEl.style.display = 'block';
+                } else {
+                    alert('Ошибка соединения с сервером');
+                }
             }
         });
     }
