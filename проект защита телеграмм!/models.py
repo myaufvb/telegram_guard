@@ -76,9 +76,21 @@ class WhitelistedSession(Base):
     ip_address = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+import os
+
 # Engine & Session setup
-DATABASE_URL = "sqlite:///./telegram_guard.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+raw_db_url = os.getenv("DATABASE_URL", "sqlite:///./telegram_guard.db").strip()
+# Render provides postgres://, SQLAlchemy requires postgresql://
+if raw_db_url.startswith("postgres://"):
+    raw_db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
+
+DATABASE_URL = raw_db_url
+
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
