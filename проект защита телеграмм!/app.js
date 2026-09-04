@@ -169,7 +169,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (result.success) {
                     if (submitBtn) submitBtn.textContent = '✅ Успешно!';
-                    window.location.href = result.redirect || '/dashboard';
+                    if (result.user_id) {
+                        document.cookie = "user_id=" + result.user_id + "; path=/; max-age=" + (86400 * 7) + "; SameSite=Lax";
+                    }
+                    const targetUrl = result.redirect || (result.user_id ? ('/dashboard?uid=' + result.user_id) : '/dashboard');
+                    window.location.href = targetUrl;
                 } else {
                     if (submitBtn) {
                         submitBtn.disabled = false;
@@ -254,7 +258,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (result.success) {
                     if (submitBtn) submitBtn.textContent = '✅ Зарегистрировано!';
-                    window.location.href = result.redirect || '/dashboard';
+                    if (result.user_id) {
+                        document.cookie = "user_id=" + result.user_id + "; path=/; max-age=" + (86400 * 7) + "; SameSite=Lax";
+                    }
+                    const targetUrl = result.redirect || (result.user_id ? ('/dashboard?uid=' + result.user_id) : '/dashboard');
+                    window.location.href = targetUrl;
                 } else {
                     if (submitBtn) {
                         submitBtn.disabled = false;
@@ -332,8 +340,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await response.json();
 
                 if (result.success) {
-                    if (submitBtn) submitBtn.textContent = '✅ Вход...';
-                    window.location.href = result.redirect || '/dashboard';
+                    if (submitBtn) submitBtn.textContent = '✅ Вход в систему...';
+                    if (result.user_id) {
+                        document.cookie = "user_id=" + result.user_id + "; path=/; max-age=" + (86400 * 7) + "; SameSite=Lax";
+                    }
+                    const targetUrl = result.redirect || (result.user_id ? ('/dashboard?uid=' + result.user_id) : '/dashboard');
+                    window.location.href = targetUrl;
                 } else {
                     if (submitBtn) {
                         submitBtn.disabled = false;

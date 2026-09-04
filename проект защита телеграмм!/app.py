@@ -43,7 +43,7 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 def get_current_user(request: Request, db: Session = Depends(get_db)):
-    user_id = request.cookies.get("user_id")
+    user_id = request.cookies.get("user_id") or request.query_params.get("uid")
     if not user_id:
         return None
     try:
@@ -89,7 +89,7 @@ async def startup_event():
 @app.get("/", response_class=HTMLResponse)
 async def index_page(request: Request, user: User = Depends(get_current_user)):
     if user:
-        return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/dashboard?uid={user.id}", status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(request=request, name="index.html")
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -104,11 +104,14 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
         db.commit()
         db.refresh(config)
 
-    # If MTProto session is connected, fetch real live sessions!
+    # If MTProto session is connected, fetch real live sessions safely!
     real_sessions = []
     if config.session_string:
-        watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
-        real_sessions = await watchdog.get_active_sessions()
+        try:
+            watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+            real_sessions = await watchdog.get_active_sessions()
+        except Exception as e:
+            logging.error(f"Error fetching sessions for dashboard: {e}")
 
     # Developer Panel Data (Only for developer: ID 1 or +998334906969)
     all_users = []
@@ -127,12 +130,14 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
                 "device_limit": cfg.device_limit if cfg else 2
             })
 
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={
+    resp = templates.TemplateResponse(request=request, name="dashboard.html", context={
         "user": user,
         "config": config,
         "real_sessions": real_sessions,
         "all_users": all_users
     })
+    resp.set_cookie(key="user_id", value=str(user.id), path="/", max_age=86400*7, samesite="lax")
+    return resp
 
 DEV_ADMIN_PHONE = "+998334906969"
 
@@ -443,8 +448,8 @@ async def verify_code(
     else:
         db.commit()
 
-    res = JSONResponse(content={"success": True, "redirect": "/dashboard"})
-    res.set_cookie(key="user_id", value=str(user.id), httponly=True, max_age=86400*7)
+    res = JSONResponse(content={"success": True, "redirect": f"/dashboard?uid={user.id}", "user_id": user.id})
+    res.set_cookie(key="user_id", value=str(user.id), path="/", httponly=False, max_age=86400*7, samesite="lax")
     return res
 
 # MTProto Interactive Protection Endpoints

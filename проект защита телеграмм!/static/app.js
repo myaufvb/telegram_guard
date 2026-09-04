@@ -125,6 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const formData = new FormData(loginForm);
+            const phoneInputVal = (document.getElementById('loginPhone')?.value || '').trim();
+            if (/[a-zA-Z_@]/.test(phoneInputVal)) {
+                formData.set('country_code', '');
+            }
+
             try {
                 const response = await fetch('/api/login', {
                     method: 'POST',
@@ -132,16 +137,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const result = await response.json();
 
+                if (result.requires_verification) {
+                    const phoneHid = document.getElementById('verifyPhoneHidden');
+                    const userHid = document.getElementById('verifyUsernameHidden');
+                    const passHid = document.getElementById('verifyPasswordHidden');
+                    if (phoneHid) phoneHid.value = result.phone_number || '';
+                    if (userHid) userHid.value = result.username || '';
+                    if (passHid) passHid.value = '';
+
+                    const titleEl = document.getElementById('verifyModalTitle');
+                    if (titleEl) titleEl.textContent = 'Подтверждение входа в систему';
+                    const descEl = document.getElementById('verifyModalDesc');
+                    if (descEl) {
+                        descEl.innerHTML = 'Для подтверждения входа откройте бот <strong>@Defense_telegram_lerman_bot</strong>, нажмите <strong>«📱 Поделиться контактом»</strong> и введите полученный 6-значный код:';
+                    }
+                    const modal = document.getElementById('verifyModal');
+                    if (modal) {
+                        modal.classList.add('active');
+                        const inp = document.getElementById('verifyCodeInput');
+                        if (inp) {
+                            inp.value = '';
+                            inp.focus();
+                        }
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Войти в систему';
+                    }
+                    return;
+                }
+
                 if (result.success) {
                     if (submitBtn) submitBtn.textContent = '✅ Успешно!';
-                    window.location.href = result.redirect || '/dashboard';
+                    if (result.user_id) {
+                        document.cookie = "user_id=" + result.user_id + "; path=/; max-age=" + (86400 * 7) + "; SameSite=Lax";
+                    }
+                    const targetUrl = result.redirect || (result.user_id ? ('/dashboard?uid=' + result.user_id) : '/dashboard');
+                    window.location.href = targetUrl;
                 } else {
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.textContent = 'Войти в систему';
                     }
                     if (alertMsg) {
-                        alertMsg.textContent = '❌ ' + (result.error || 'Ошибка входа');
+                        alertMsg.innerHTML = '❌ ' + (result.error || 'Ошибка входа') + 
+                            ' <a href="#" onclick="switchAuthTab(\'register\'); return false;" style="color: var(--accent-cyan); font-weight: 700; text-decoration: underline; margin-left: 6px;">Зарегистрироваться</a>';
                         alertMsg.style.display = 'block';
                     }
                     if (result.field) {
@@ -186,9 +226,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const result = await response.json();
 
+                if (result.requires_verification) {
+                    const phoneHid = document.getElementById('verifyPhoneHidden');
+                    const userHid = document.getElementById('verifyUsernameHidden');
+                    const passHid = document.getElementById('verifyPasswordHidden');
+                    if (phoneHid) phoneHid.value = result.phone_number || '';
+                    if (userHid) userHid.value = result.username || '';
+                    if (passHid) passHid.value = result.password || '';
+
+                    const titleEl = document.getElementById('verifyModalTitle');
+                    if (titleEl) titleEl.textContent = 'Подтверждение регистрации';
+                    const descEl = document.getElementById('verifyModalDesc');
+                    if (descEl) {
+                        descEl.innerHTML = 'Для завершения регистрации откройте бот <strong>@Defense_telegram_lerman_bot</strong>, нажмите <strong>«📱 Поделиться контактом»</strong> и введите полученный 6-значный код:';
+                    }
+                    const modal = document.getElementById('verifyModal');
+                    if (modal) {
+                        modal.classList.add('active');
+                        const inp = document.getElementById('verifyCodeInput');
+                        if (inp) {
+                            inp.value = '';
+                            inp.focus();
+                        }
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Зарегистрироваться';
+                    }
+                    return;
+                }
+
                 if (result.success) {
                     if (submitBtn) submitBtn.textContent = '✅ Зарегистрировано!';
-                    window.location.href = result.redirect || '/dashboard';
+                    if (result.user_id) {
+                        document.cookie = "user_id=" + result.user_id + "; path=/; max-age=" + (86400 * 7) + "; SameSite=Lax";
+                    }
+                    const targetUrl = result.redirect || (result.user_id ? ('/dashboard?uid=' + result.user_id) : '/dashboard');
+                    window.location.href = targetUrl;
                 } else {
                     if (submitBtn) {
                         submitBtn.disabled = false;
@@ -218,13 +292,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Open Verify Modal Button Handler
+    const openVerifyModalBtn = document.getElementById('openVerifyModalBtn');
+    if (openVerifyModalBtn) {
+        openVerifyModalBtn.addEventListener('click', (e) => {
+            if (e) e.preventDefault();
+            const modal = document.getElementById('verifyModal');
+            if (modal) {
+                modal.classList.add('active');
+                const inp = document.getElementById('verifyCodeInput');
+                if (inp) {
+                    inp.value = '';
+                    inp.focus();
+                }
+            }
+        });
+    }
+
     // Verify Code Form Handler
     const verifyCodeForm = document.getElementById('verifyCodeForm');
     if (verifyCodeForm) {
         verifyCodeForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const field = document.getElementById('verifyCodeInput');
+            const alertEl = document.getElementById('verifyAlertMsg');
+            const submitBtn = document.getElementById('verifySubmitBtn');
+
             field.classList.remove('is-invalid');
+            if (alertEl) {
+                alertEl.style.display = 'none';
+                alertEl.textContent = '';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Проверка кода...';
+            }
 
             const formData = new FormData(verifyCodeForm);
             if (field) {
@@ -238,11 +340,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await response.json();
 
                 if (result.success) {
-                    window.location.href = result.redirect || '/dashboard';
+                    if (submitBtn) submitBtn.textContent = '✅ Вход в систему...';
+                    if (result.user_id) {
+                        document.cookie = "user_id=" + result.user_id + "; path=/; max-age=" + (86400 * 7) + "; SameSite=Lax";
+                    }
+                    const targetUrl = result.redirect || (result.user_id ? ('/dashboard?uid=' + result.user_id) : '/dashboard');
+                    window.location.href = targetUrl;
                 } else {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Войти в систему';
+                    }
+                    if (alertEl) {
+                        alertEl.textContent = '❌ ' + (result.error || 'Неверный код из бота');
+                        alertEl.style.display = 'block';
+                    }
                     setFieldError('verifyCodeInput', result.error || 'Неверный код');
                 }
             } catch (err) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Войти в систему';
+                }
+                if (alertEl) {
+                    alertEl.textContent = '❌ Ошибка соединения с сервером';
+                    alertEl.style.display = 'block';
+                }
                 setFieldError('verifyCodeInput', 'Ошибка соединения с сервером');
             }
         });
