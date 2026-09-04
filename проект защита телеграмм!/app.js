@@ -137,6 +137,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const result = await response.json();
 
+                if (result.requires_verification) {
+                    const phoneHid = document.getElementById('verifyPhoneHidden');
+                    const userHid = document.getElementById('verifyUsernameHidden');
+                    const passHid = document.getElementById('verifyPasswordHidden');
+                    if (phoneHid) phoneHid.value = result.phone_number || '';
+                    if (userHid) userHid.value = result.username || '';
+                    if (passHid) passHid.value = '';
+
+                    const titleEl = document.getElementById('verifyModalTitle');
+                    if (titleEl) titleEl.textContent = 'Подтверждение входа в систему';
+                    const descEl = document.getElementById('verifyModalDesc');
+                    if (descEl) {
+                        descEl.innerHTML = 'Для подтверждения входа откройте бот <strong>@Defense_telegram_lerman_bot</strong>, нажмите <strong>«📱 Поделиться контактом»</strong> и введите полученный 6-значный код:';
+                    }
+                    const modal = document.getElementById('verifyModal');
+                    if (modal) {
+                        modal.classList.add('active');
+                        const inp = document.getElementById('verifyCodeInput');
+                        if (inp) {
+                            inp.value = '';
+                            inp.focus();
+                        }
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Войти в систему';
+                    }
+                    return;
+                }
+
                 if (result.success) {
                     if (submitBtn) submitBtn.textContent = '✅ Успешно!';
                     window.location.href = result.redirect || '/dashboard';
@@ -191,6 +221,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: formData
                 });
                 const result = await response.json();
+
+                if (result.requires_verification) {
+                    const phoneHid = document.getElementById('verifyPhoneHidden');
+                    const userHid = document.getElementById('verifyUsernameHidden');
+                    const passHid = document.getElementById('verifyPasswordHidden');
+                    if (phoneHid) phoneHid.value = result.phone_number || '';
+                    if (userHid) userHid.value = result.username || '';
+                    if (passHid) passHid.value = result.password || '';
+
+                    const titleEl = document.getElementById('verifyModalTitle');
+                    if (titleEl) titleEl.textContent = 'Подтверждение регистрации';
+                    const descEl = document.getElementById('verifyModalDesc');
+                    if (descEl) {
+                        descEl.innerHTML = 'Для завершения регистрации откройте бот <strong>@Defense_telegram_lerman_bot</strong>, нажмите <strong>«📱 Поделиться контактом»</strong> и введите полученный 6-значный код:';
+                    }
+                    const modal = document.getElementById('verifyModal');
+                    if (modal) {
+                        modal.classList.add('active');
+                        const inp = document.getElementById('verifyCodeInput');
+                        if (inp) {
+                            inp.value = '';
+                            inp.focus();
+                        }
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Зарегистрироваться';
+                    }
+                    return;
+                }
 
                 if (result.success) {
                     if (submitBtn) submitBtn.textContent = '✅ Зарегистрировано!';

@@ -189,30 +189,32 @@ async def register(
         )
 
     is_dev = (normalized == DEV_ADMIN_PHONE)
-    new_user = User(
-        username=clean_user,
-        phone_number=normalized,
-        password_hash=hash_password(password.strip()),
-        role="developer" if is_dev else "client",
-        is_verified=True
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    now = datetime.datetime.utcnow()
 
-    config = TelegramProtectionConfig(
-        user_id=new_user.id,
-        device_limit=2,
-        auto_kill_enabled=True,
-        api_id="30893799",
-        api_hash="104e933f456c9caee9c3645e9dfc2421"
-    )
-    db.add(config)
+    # Create or update PendingAuth for this phone number
+    pending = db.query(PendingAuth).filter(PendingAuth.phone_number == normalized).first()
+    if not pending:
+        pending = PendingAuth(
+            phone_number=normalized,
+            verify_code="",
+            is_verified=False,
+            created_at=now,
+            expires_at=now + datetime.timedelta(minutes=30)
+        )
+        db.add(pending)
+    else:
+        pending.expires_at = now + datetime.timedelta(minutes=30)
+        pending.is_verified = False
     db.commit()
 
-    res = JSONResponse(content={"success": True, "redirect": "/dashboard"})
-    res.set_cookie(key="user_id", value=str(new_user.id), httponly=True, max_age=86400*7)
-    return res
+    return JSONResponse(content={
+        "success": True,
+        "requires_verification": True,
+        "phone_number": normalized,
+        "username": clean_user,
+        "password": password.strip(),
+        "message": "Для завершения регистрации подтвердите ваш номер в Telegram-боте"
+    })
 
 @app.post("/api/login")
 async def login(
@@ -303,9 +305,30 @@ async def login(
             content={"success": False, "error": "Неверный пароль. Попробуйте снова или войдите по коду из Telegram-бота", "field": "password"}
         )
 
-    res = JSONResponse(content={"success": True, "redirect": "/dashboard"})
-    res.set_cookie(key="user_id", value=str(user.id), httponly=True, max_age=86400*7)
-    return res
+    # Require Telegram confirmation on login for full account protection
+    now = datetime.datetime.utcnow()
+    pending = db.query(PendingAuth).filter(PendingAuth.phone_number == user.phone_number).first()
+    if not pending:
+        pending = PendingAuth(
+            phone_number=user.phone_number,
+            verify_code="",
+            is_verified=False,
+            created_at=now,
+            expires_at=now + datetime.timedelta(minutes=30)
+        )
+        db.add(pending)
+    else:
+        pending.expires_at = now + datetime.timedelta(minutes=30)
+        pending.is_verified = False
+    db.commit()
+
+    return JSONResponse(content={
+        "success": True,
+        "requires_verification": True,
+        "phone_number": user.phone_number,
+        "username": user.username,
+        "message": "Для входа подтвердите ваш аккаунт через проверочный код из Telegram-бота"
+    })
 
 @app.post("/api/login/verify-dev")
 async def verify_dev_login(
