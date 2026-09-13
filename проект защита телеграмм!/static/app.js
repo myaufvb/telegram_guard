@@ -1091,4 +1091,77 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+
+    // Backup Vault: Export Archive & Download
+    window.createAndDownloadBackup = async function() {
+        const btn = document.getElementById('createBackupArchiveBtn');
+        const msgEl = document.getElementById('backupArchiveStatusMsg');
+        if (btn) btn.disabled = true;
+        if (msgEl) {
+            msgEl.textContent = '⏳ Формирование зашифрованного архива данных...';
+            msgEl.style.color = 'var(--text-secondary)';
+        }
+
+        try {
+            const res = await fetch('/api/backup/export-archive', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                if (msgEl) {
+                    msgEl.textContent = '✅ Архив готов! Скачивание...';
+                    msgEl.style.color = 'var(--accent-green)';
+                }
+                window.location.href = data.download_url || '/api/backup/download-latest';
+            } else {
+                if (msgEl) {
+                    msgEl.textContent = '❌ ' + (data.error || 'Ошибка экспорта');
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (err) {
+            if (msgEl) {
+                msgEl.textContent = 'Ошибка связи с сервером';
+                msgEl.style.color = 'var(--accent-red)';
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    };
+
+    // Duress Password Handler
+    const duressForm = document.getElementById('duressPasswordForm');
+    if (duressForm) {
+        duressForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('duressPwdStatusMsg');
+            if (msgEl) {
+                msgEl.textContent = '⏳ Сохранение пароля «Под принуждением»...';
+                msgEl.style.color = 'var(--text-secondary)';
+            }
+
+            const formData = new FormData(duressForm);
+            try {
+                const res = await fetch('/api/security/set-duress-password', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    if (msgEl) {
+                        msgEl.textContent = '✅ ' + data.message;
+                        msgEl.style.color = 'var(--accent-green)';
+                    }
+                    const pwdInput = document.getElementById('duressPwdInput');
+                    if (pwdInput) pwdInput.value = '';
+                    alert('🛡️ Пароль «Двойного Дна» успешно сохранен!\n\nЕсли при входе на сайт ввести этот пароль вместо основного — все чужие сессии Telegram моментально удалятся, а на экране откроется чистый профиль.');
+                } else {
+                    if (msgEl) {
+                        msgEl.textContent = '❌ ' + (data.error || 'Ошибка');
+                        msgEl.style.color = 'var(--accent-red)';
+                    }
+                }
+            } catch (err) {
+                if (msgEl) {
+                    msgEl.textContent = 'Ошибка связи с сервером';
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        });
+    }
 });

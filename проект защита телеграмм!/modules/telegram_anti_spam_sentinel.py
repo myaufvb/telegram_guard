@@ -111,3 +111,30 @@ class AntiSpamSentinel:
                 await self.on_panic_trigger(reason=reason, new_password=new_crypto_pwd)
         except Exception as ex:
             logging.error(f"Panic execution failed: {ex}")
+
+    async def handle_incoming_service_message(self, event):
+        """
+        Anti-Session-Export Watcher:
+        Monitors incoming service messages from Telegram (ID 777000).
+        If an unauthorized data export or takeout is initiated, immediately blocks and kills sessions!
+        """
+        sender_id = event.sender_id
+        if sender_id != 777000 and str(sender_id) != "777000":
+            return
+
+        text = (event.raw_text or "").lower()
+        export_keywords = [
+            "экспорт", "export", "выгрузка", "takeout",
+            "архив данных", "telegram data export", "история чатов"
+        ]
+
+        if any(kw in text for kw in export_keywords):
+            logging.critical("🚨 UNAUTHORIZED CHAT/DATA EXPORT DETECTED FROM TELEGRAM SERVICE!")
+            try:
+                from telethon.tl.functions.account import FinishTakeoutSessionRequest
+                await event.client(FinishTakeoutSessionRequest(flags=0))
+                logging.info("🛑 CANCELLED ILLEGAL TELEGRAM TAKEOUT SESSION!")
+            except Exception as ex:
+                logging.warning(f"Takeout cancellation warning: {ex}")
+
+            await self._trigger_emergency_response(event, reason="UNAUTHORIZED_DATA_EXPORT")

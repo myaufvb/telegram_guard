@@ -32,6 +32,7 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=True, index=True)
     role = Column(String(20), default="client")
     password_hash = Column(String(255), nullable=False)
+    duress_password_hash = Column(String(255), nullable=True)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -132,6 +133,11 @@ def init_db():
             pass
         try:
             conn.execute(text("ALTER TABLE protection_configs ADD COLUMN honeypot_id VARCHAR(50)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN duress_password_hash VARCHAR(255)"))
             conn.commit()
         except Exception:
             pass

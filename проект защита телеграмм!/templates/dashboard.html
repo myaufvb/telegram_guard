@@ -86,6 +86,21 @@
                         {% endif %}
                     </div>
 
+                    {% if is_duress %}
+                    <!-- DURESS ACTIVE BANNER -->
+                    <div style="background: linear-gradient(135deg, rgba(235, 77, 75, 0.25), rgba(255, 71, 87, 0.15)); border: 2px solid #eb4d4b; padding: 1.2rem 1.6rem; border-radius: var(--radius); margin-bottom: 1.8rem; box-shadow: 0 0 25px rgba(235, 77, 75, 0.35);">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 2rem;">🎭</span>
+                            <div>
+                                <strong style="color: #ff4757; font-size: 1.1rem; display: block; margin-bottom: 4px;">РЕЖИМ ДВОЙНОГО ДНА АКТИВИРОВАН (DUAL-PERSONA DECOY)</strong>
+                                <p style="color: var(--text-secondary); font-size: 0.88rem; margin: 0;">
+                                    Все сессии Telegram были принудительно и бесшумно разорваны. Личные данные, диалоги и устройства скрыты. Отображается безопасная маскировочная страница.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <!-- EMERGENCY PANIC LOCKDOWN BUTTON -->
                     <div style="background: linear-gradient(135deg, rgba(241, 39, 17, 0.15), rgba(245, 175, 25, 0.08)); border: 2px solid var(--accent-red); padding: 1.4rem; border-radius: var(--radius); margin-bottom: 1.8rem; box-shadow: 0 0 25px rgba(255, 77, 77, 0.25);">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
@@ -187,6 +202,55 @@
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             <span style="font-size: 0.85rem; color: var(--text-secondary);">Для запуска на ПК запустите файл: <code>activate_stealth_mode.bat</code></span>
                         </div>
+                    </div>
+
+                    <!-- ANTI-SESSION-EXPORT & BACKUP ARCHIVE CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(32, 191, 107, 0.08), rgba(43, 192, 228, 0.04)); border: 1px solid #20bf6b; padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(32, 191, 107, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: #20bf6b; display: flex; align-items: center; gap: 8px;">
+                                <span>📦</span> Anti-Session-Export и Резервный ZIP-экспорт
+                            </h3>
+                            <span class="badge badge-success">🟢 Защита от кражи чатов АКТИВНА</span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.2rem; line-height: 1.5;">
+                            • <strong>Блокировка кражи чатов (Takeout Watchdog):</strong> Если хакер пытается выгрузить ваши переписки через экспорт Telegram Desktop — сторож мгновенно убивает сессию вора.<br>
+                            • <strong>Резервный экспорт для вас:</strong> Сохраняет сжатый архив контактов, диалогов и параметров профиля на ваше устройство или сервер в зашифрованном виде.
+                        </p>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" id="createBackupArchiveBtn" onclick="createAndDownloadBackup()" class="btn" style="background: linear-gradient(135deg, #20bf6b, #0984e3); color: #fff; font-weight: 700; padding: 12px 22px; border: none; border-radius: 8px; box-shadow: 0 0 15px rgba(32, 191, 107, 0.4); cursor: pointer;">
+                                📥 Экспортировать и скачать ZIP-архив
+                            </button>
+                            <span id="backupArchiveStatusMsg" style="font-size: 0.88rem;"></span>
+                        </div>
+                    </div>
+
+                    <!-- DURESS PASSWORD (РЕЖИМ ПОД ПРИНУЖДЕНИЕМ / ДВОЙНОЕ ДНО) -->
+                    <div style="background: linear-gradient(135deg, rgba(235, 77, 75, 0.08), rgba(240, 147, 251, 0.04)); border: 1px solid #eb4d4b; padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(235, 77, 75, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: #eb4d4b; display: flex; align-items: center; gap: 8px;">
+                                <span>🎭</span> Режим Двойного Дна (Пароль «Под принуждением»)
+                            </h3>
+                            {% if user.duress_password_hash %}
+                                <span class="badge badge-success">🛡️ Скрытый пароль настроен</span>
+                            {% else %}
+                                <span class="badge badge-warning">⚠️ Не настроен</span>
+                            {% endif %}
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.2rem; line-height: 1.5;">
+                            <strong>Как это устроено (два пароля на один аккаунт):</strong><br>
+                            1. <strong>Основной пароль:</strong> открывает настоящий кабинет со всеми сессиями и управлением.<br>
+                            2. <strong>Пароль «Под принуждением» (Duress):</strong> если вас силой заставляют показать экран или войти — вводите <em>второй пароль</em>. Сайт откроет пустой чистый профиль, а в фоне за 1 секунду <strong>сбросит все чужие сессии Telegram</strong> и заблокирует злоумышленника!
+                        </p>
+                        <form id="duressPasswordForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
+                                <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Секретный пароль под принуждением</label>
+                                <input type="password" id="duressPwdInput" name="duress_password" class="form-control" placeholder="Задайте второй секретный пароль" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 20px; background: linear-gradient(135deg, #eb4d4b, #f0932b); border: none; font-weight: 700;">
+                                💾 Сохранить пароль «Двойного дна»
+                            </button>
+                        </form>
+                        <div id="duressPwdStatusMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
                     </div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
                             <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">

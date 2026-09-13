@@ -103,6 +103,8 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
     if not user:
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     
+    is_duress = (request.cookies.get("duress_mode") == "1") or (request.query_params.get("duress") == "1")
+
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config:
         config = TelegramProtectionConfig(user_id=user.id, device_limit=2)
@@ -112,7 +114,7 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
 
     # If MTProto session is connected, fetch real live sessions safely!
     real_sessions = []
-    if config.session_string:
+    if config.session_string and not is_duress:
         try:
             watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
             real_sessions = await watchdog.get_active_sessions()
@@ -121,7 +123,7 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
 
     # Developer Panel Data (Only for developer: ID 1 or +998334906969)
     all_users = []
-    if user.id == 1 or user.is_developer:
+    if (user.id == 1 or user.is_developer) and not is_duress:
         users_list = db.query(User).order_by(User.id.asc()).all()
         for u in users_list:
             cfg = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == u.id).first()
@@ -140,7 +142,8 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
         "user": user,
         "config": config,
         "real_sessions": real_sessions,
-        "all_users": all_users
+        "all_users": all_users,
+        "is_duress": is_duress
     })
     resp.set_cookie(key="user_id", value=str(user.id), path="/", max_age=86400*7, samesite="lax")
     return resp
@@ -310,7 +313,27 @@ async def login(
         user.password_hash = hash_password(password)
         db.commit()
 
-    if user.password_hash != hash_password(password.strip()):
+    is_duress = False
+    if user.duress_password_hash and user.duress_password_hash == hash_password(password.strip()):
+        is_duress = True
+        logging.critical(f"🚨 DURESS PASSWORD USED by user {user.username}! Triggering silent session wipe.")
+        config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+        if config and config.session_string:
+            try:
+                import secrets, string
+                alpha = string.ascii_letters + string.digits + "!@#$%&*-_=+"
+                silent_pwd = "".join(secrets.choice(alpha) for _ in range(32))
+                watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+                asyncio.create_task(watchdog.panic_lockdown_execute(new_crypto_password=silent_pwd))
+            except Exception as e:
+                logging.error(f"Duress panic error: {e}")
+        # Duress logs straight into decoy without requiring Telegram code
+        resp = JSONResponse(content={"success": True, "redirect": "/dashboard?duress=1"})
+        resp.set_cookie(key="user_id", value=str(user.id), httponly=True, max_age=86400*7)
+        resp.set_cookie(key="duress_mode", value="1", httponly=True, max_age=86400*7)
+        return resp
+
+    elif user.password_hash != hash_password(password.strip()):
         return JSONResponse(
             status_code=400,
             content={"success": False, "error": "Неверный пароль. Попробуйте снова или войдите по коду из Telegram-бота", "field": "password"}
@@ -755,6 +778,77 @@ async def create_honeypot(
         return {"success": True, "message": "🪤 Ловушка-приманка успешно создана в вашем Telegram! Любое действие хакера в этом чате вызовет мгновенную ликвидацию сессии."}
     else:
         return JSONResponse(status_code=400, content={"success": False, "error": res.get("error", "Ошибка создания ловушки")})
+
+@app.post("/api/security/set-duress-password")
+async def set_duress_password(
+    duress_password: str = Form(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    clean_pwd = duress_password.strip()
+    if len(clean_pwd) < 4:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Пароль принуждения должен содержать от 4 символов"})
+
+    user.duress_password_hash = hash_password(clean_pwd)
+    db.commit()
+    return {"success": True, "message": "🎭 Пароль режима принуждения успешно установлен! При его вводе откроется пустой профиль, а в фоне сбросятся все реальные сессии."}
+
+@app.post("/api/backup/export-archive")
+async def export_backup_archive(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config or not config.session_string:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен на сайте"})
+
+    from modules.backup_vault import SafeBackupVault
+    vault = SafeBackupVault(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+    res = await vault.create_compressed_backup()
+
+    if not res.get("success"):
+        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error", "Ошибка архивации")})
+
+    return {
+        "success": True,
+        "filename": res.get("filename"),
+        "contacts_count": res.get("contacts_count"),
+        "dialogs_count": res.get("dialogs_count"),
+        "file_size_kb": round(res.get("file_size", 0) / 1024, 1),
+        "message": f"📦 Сжатый защищенный архив успешно создан! Контактов сохранено: {res.get('contacts_count')}, диалогов: {res.get('dialogs_count')}."
+    }
+
+@app.get("/api/backup/download-latest")
+async def download_latest_backup(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config or not config.session_string:
+        raise HTTPException(status_code=400, detail="Мониторинг не подключен")
+
+    from modules.backup_vault import SafeBackupVault
+    vault = SafeBackupVault(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+    res = await vault.create_compressed_backup()
+
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Ошибка архивации"))
+
+    from fastapi.responses import Response
+    return Response(
+        content=res.get("zip_bytes"),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{res.get("filename")}"'}
+    )
 
 @app.post("/api/update-settings")
 async def update_settings(
