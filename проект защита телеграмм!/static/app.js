@@ -987,4 +987,78 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+
+    // Geofence Form Handler
+    const geofenceForm = document.getElementById('geofenceForm');
+    if (geofenceForm) {
+        geofenceForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('geofenceStatusMsg');
+            if (msgEl) {
+                msgEl.textContent = '⏳ Сохранение параметров Гео-замка...';
+                msgEl.style.color = 'var(--text-secondary)';
+            }
+
+            const formData = new FormData(geofenceForm);
+            try {
+                const res = await fetch('/api/security/toggle-geofence', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    if (msgEl) {
+                        msgEl.textContent = '✅ ' + data.message;
+                        msgEl.style.color = 'var(--accent-green)';
+                    }
+                } else {
+                    if (msgEl) {
+                        msgEl.textContent = '❌ ' + (data.error || 'Ошибка');
+                        msgEl.style.color = 'var(--accent-red)';
+                    }
+                }
+            } catch (err) {
+                if (msgEl) {
+                    msgEl.textContent = 'Ошибка соединения с сервером';
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        });
+    }
+
+    // Emergency Panic Lockdown Handler
+    window.triggerPanicLockdown = async function() {
+        const confirmAction = confirm("🚨 ВНИМАНИЕ: АКТИВИРОВАТЬ ЭКСТРЕННУЮ ЗАМОРОЗКУ?\n\n- Будут немедленно выбиты ВСЕ чужие устройства с аккаунта!\n- Будет сгенерирован и установлен новый 32-значный крипто-пароль 2FA!\n- Включится 1-секундный строгий режим авто-киллера.\n\nПродолжить?");
+        if (!confirmAction) return;
+
+        const msgEl = document.getElementById('panicStatusMsg');
+        if (msgEl) {
+            msgEl.style.display = 'block';
+            msgEl.textContent = '⏳ ВЫПОЛНЕНИЕ ЭКСТРЕННОЙ ЗАМОРОЗКИ АККАУНТА...';
+            msgEl.style.color = 'var(--accent-red)';
+        }
+
+        try {
+            const res = await fetch('/api/security/panic-lockdown', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                if (msgEl) {
+                    msgEl.textContent = '🛡️ ' + data.message;
+                    msgEl.style.color = 'var(--accent-green)';
+                }
+                const display = document.getElementById('otpCodeDisplay');
+                if (display && data.new_password) {
+                    display.textContent = data.new_password;
+                }
+                alert("🚨 ЗАМОРОЗКА УСПЕШНО АКТИВИРОВАНА!\n\nВсе сессии хакера сброшены.\nНовый 32-значный пароль привязан к вашему Telegram.");
+            } else {
+                if (msgEl) {
+                    msgEl.textContent = '❌ Ошибка: ' + (data.error || 'Не удалось заблокировать');
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (err) {
+            if (msgEl) {
+                msgEl.textContent = 'Ошибка соединения с сервером';
+                msgEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
 });

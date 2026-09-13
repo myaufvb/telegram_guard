@@ -70,10 +70,15 @@ async def periodic_session_watchdog_loop():
                         api_hash=cfg.api_hash,
                         session_string=cfg.session_string
                     )
-                    res = await watchdog.sentinel_instant_kick(cfg.device_limit)
+                    res = await watchdog.sentinel_instant_kick(
+                        device_limit=cfg.device_limit,
+                        geofence_enabled=cfg.geofence_enabled,
+                        allowed_countries=cfg.allowed_countries
+                    )
                     kicked = res.get("kicked", [])
                     if kicked:
-                        logging.critical(f"⚡ SENTINEL: User {cfg.user_id} - Terminated {len(kicked)} intruder device(s) within 1 sec!")
+                        for k in kicked:
+                            logging.critical(f"⚡ SENTINEL: User {cfg.user_id} - Terminated intruder device {k.get('device')} ({k.get('ip')}, {k.get('country')}) [Reason: {k.get('reason')}]")
                 except Exception as ex:
                     logging.error(f"Error in Sentinel watchdog for user {cfg.user_id}: {ex}")
             db.close()
@@ -657,6 +662,76 @@ async def generate_crypto_32(
         "success": True,
         "crypto_password": crypto_password,
         "message": "🛡️ 32-значный криптографический пароль успешно установлен на ваш Telegram!"
+    }
+
+@app.post("/api/security/toggle-geofence")
+async def toggle_geofence(
+    enabled: bool = Form(...),
+    allowed_countries: str = Form("UZ,RU"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config:
+        config = TelegramProtectionConfig(user_id=user.id)
+        db.add(config)
+
+    config.geofence_enabled = enabled
+    config.allowed_countries = allowed_countries.strip()
+    db.commit()
+
+    status_text = "включен" if enabled else "отключен"
+    return {
+        "success": True,
+        "geofence_enabled": config.geofence_enabled,
+        "allowed_countries": config.allowed_countries,
+        "message": f"🌍 Гео-замок IP успешно {status_text}! Разрешенные страны: {config.allowed_countries}"
+    }
+
+@app.post("/api/security/panic-lockdown")
+async def panic_lockdown(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    EMERGENCY PANIC LOCKDOWN:
+    1. Kicks ALL sessions on the Telegram account immediately.
+    2. Generates a new 32-character crypto key and locks 2FA.
+    3. Enables 1-second auto-kill with device limit = 1.
+    """
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config or not config.session_string:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен на сайте"})
+
+    import secrets
+    alphabet = string.ascii_letters + string.digits + "!@#$%&*-_=+"
+    panic_crypto_pwd = "".join(secrets.choice(alphabet) for _ in range(32))
+
+    watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+    res = await watchdog.panic_lockdown_execute(new_crypto_password=panic_crypto_pwd)
+
+    config.current_2fa_otp = panic_crypto_pwd
+    config.device_limit = 1
+    config.auto_kill_enabled = True
+    config.lockdown_active = True
+    db.commit()
+
+    active_otp_store[user.id] = {
+        "code": panic_crypto_pwd,
+        "generated_at": datetime.datetime.utcnow().isoformat()
+    }
+
+    return {
+        "success": True,
+        "terminated_count": res.get("terminated_sessions", 0),
+        "new_password": panic_crypto_pwd,
+        "message": f"🚨 ЭКСТРЕННАЯ ЗАМОРОЗКА АКТИВИРОВАНА! Сброшено {res.get('terminated_sessions', 0)} сессий. Установлен новый 32-значный крипто-пароль."
     }
 
 @app.post("/api/update-settings")

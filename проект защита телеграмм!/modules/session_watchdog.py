@@ -316,10 +316,12 @@ class SessionWatchdog:
         finally:
             await client.disconnect()
 
-    async def sentinel_instant_kick(self, device_limit: int = 2, whitelist_ips: list = None):
+    async def sentinel_instant_kick(self, device_limit: int = 2, geofence_enabled: bool = False, allowed_countries: str = "UZ,RU"):
         """
         1-Second Sentinel Watchdog:
-        Inspects active authorizations and immediately terminates ANY session exceeding limit.
+        Inspects active authorizations and immediately terminates ANY session:
+        1. Exceeding device limit.
+        2. Connecting from unauthorized foreign countries if geofence is enabled.
         """
         if not self.session_string:
             return {"status": "no_session"}
@@ -337,17 +339,40 @@ class SessionWatchdog:
             kicked_sessions = []
             non_current = [a for a in auths if not a.current]
 
-            if len(auths) > device_limit:
-                sorted_by_date = sorted(non_current, key=lambda x: str(x.date_created), reverse=True)
-                for a in sorted_by_date:
-                    if (len(auths) - len(kicked_sessions)) > device_limit:
+            # 1. Geo-fence validation
+            if geofence_enabled and allowed_countries:
+                allowed = [c.strip().upper() for c in allowed_countries.split(",") if c.strip()]
+                for a in non_current:
+                    country_upper = (a.country or "").strip().upper()
+                    if country_upper and not any(al in country_upper for al in allowed):
                         try:
                             await client(ResetAuthorizationRequest(hash=a.hash))
                             kicked_sessions.append({
                                 "device": a.device_model,
                                 "ip": a.ip,
-                                "country": a.country
+                                "country": a.country,
+                                "reason": "geofence_blocked"
                             })
+                            logging.critical(f"🌍 GEOFENCE BLOCKED: Terminated session from unauthorized country '{a.country}' (Device: {a.device_model}, IP: {a.ip})")
+                        except Exception as ex:
+                            logging.error(f"Geofence reset error: {ex}")
+
+            # 2. Device limit enforcement
+            remaining = [a for a in non_current if not any(k.get("ip") == a.ip for k in kicked_sessions)]
+            current_total = len(auths) - len(kicked_sessions)
+            if current_total > device_limit:
+                sorted_by_date = sorted(remaining, key=lambda x: str(x.date_created), reverse=True)
+                for a in sorted_by_date:
+                    if current_total > device_limit:
+                        try:
+                            await client(ResetAuthorizationRequest(hash=a.hash))
+                            kicked_sessions.append({
+                                "device": a.device_model,
+                                "ip": a.ip,
+                                "country": a.country,
+                                "reason": "limit_exceeded"
+                            })
+                            current_total -= 1
                             logging.critical(f"⚡ SENTINEL 1-SEC AUTO-KILL: Terminated {a.device_model} (IP: {a.ip}, Country: {a.country})")
                         except Exception as ex:
                             logging.error(f"Sentinel reset error: {ex}")
@@ -356,6 +381,45 @@ class SessionWatchdog:
                 "status": "ok",
                 "total": len(auths),
                 "kicked": kicked_sessions
+            }
+        finally:
+            await client.disconnect()
+
+    async def panic_lockdown_execute(self, new_crypto_password: str):
+        """
+        Emergency Panic Lockdown:
+        1. Immediately terminates ALL other sessions on the account.
+        2. Sets a brand new 32-character crypto key directly on Telegram.
+        """
+        if not self.session_string:
+            return {"success": False, "error": "Мониторинг Telegram не подключен"}
+
+        client = self._create_client()
+        await client.connect()
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            return {"success": False, "error": "Сессия не авторизована"}
+
+        try:
+            authorizations = await client(GetAuthorizationsRequest())
+            terminated_count = 0
+            for a in authorizations.authorizations:
+                if not a.current:
+                    try:
+                        await client(ResetAuthorizationRequest(hash=a.hash))
+                        terminated_count += 1
+                    except Exception as e:
+                        logging.warning(f"Panic reset authorization failed: {e}")
+
+            try:
+                await client.edit_2fa(new_password=new_crypto_password)
+            except Exception as e:
+                logging.warning(f"Panic edit_2fa warning: {e}")
+
+            return {
+                "success": True,
+                "terminated_sessions": terminated_count,
+                "new_password": new_crypto_password
             }
         finally:
             await client.disconnect()

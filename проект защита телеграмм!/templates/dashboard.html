@@ -86,6 +86,70 @@
                         {% endif %}
                     </div>
 
+                    <!-- EMERGENCY PANIC LOCKDOWN BUTTON -->
+                    <div style="background: linear-gradient(135deg, rgba(241, 39, 17, 0.15), rgba(245, 175, 25, 0.08)); border: 2px solid var(--accent-red); padding: 1.4rem; border-radius: var(--radius); margin-bottom: 1.8rem; box-shadow: 0 0 25px rgba(255, 77, 77, 0.25);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                            <div>
+                                <h3 style="color: var(--accent-red); font-size: 1.15rem; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+                                    <span>🚨</span> КРАСНАЯ КНОПКА: Экстренная Заморозка Аккаунта
+                                </h3>
+                                <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">
+                                    В 1 клик сбрасывает абсолютно все чужие сессии, ставит новый 32-значный крипто-пароль и включает режим максимальной тревоги.
+                                </p>
+                            </div>
+                            <button type="button" onclick="triggerPanicLockdown()" class="btn" style="background: linear-gradient(135deg, #ff0844, #ffb199); color: #fff; font-weight: 800; padding: 12px 24px; border: none; border-radius: 8px; box-shadow: 0 0 20px rgba(255, 8, 68, 0.6); cursor: pointer; white-space: nowrap;">
+                                🛑 ЗАМОРОЗИТЬ АККАУНТ СЕЙЧАС
+                            </button>
+                        </div>
+                        <div id="panicStatusMsg" style="margin-top: 10px; font-size: 0.9rem; display: none;"></div>
+                    </div>
+
+                    <!-- MANDATORY GMAIL VERIFICATION WARNING BANNER -->
+                    {% if not user.email %}
+                    <div style="background: rgba(245, 175, 25, 0.12); border: 1px solid #f5af19; padding: 1rem 1.4rem; border-radius: var(--radius); margin-bottom: 1.8rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.5rem;">⚠️</span>
+                            <div>
+                                <strong style="color: #f5af19; font-size: 0.95rem;">Обязательно привяжите надежный 2FA Gmail</strong>
+                                <p style="color: var(--text-secondary); font-size: 0.84rem; margin: 0;">
+                                    Без привязанной резервной почты аккаунт уязвим при утере SIM-карты.
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="switchDashboardTab('tab-site-security')" class="btn btn-secondary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; border-color: #f5af19; color: #f5af19;">
+                            ✉️ Привязать Gmail сейчас
+                        </button>
+                    </div>
+                    {% endif %}
+
+                    <!-- GEO-FENCE LOCK CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(46, 213, 115, 0.08), rgba(0, 242, 254, 0.04)); border: 1px solid var(--accent-green); padding: 1.4rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(46, 213, 115, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
+                                <span>🌍</span> Гео-замок IP (Geo-Fence Lock)
+                            </h3>
+                            {% if config.geofence_enabled %}
+                                <span class="badge badge-success">🟢 Гео-замок АКТИВЕН ({{ config.allowed_countries }})</span>
+                            {% else %}
+                                <span class="badge badge-warning">⚪ Отключен</span>
+                            {% endif %}
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1rem;">
+                            Автоматически ликвидирует любые подключения из иностранных государств, подозрительных VPN или зарубежных прокси за 1 секунду.
+                        </p>
+                        <form id="geofenceForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
+                                <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Разрешенные страны (коды через запятую)</label>
+                                <input type="text" id="allowedCountriesInput" name="allowed_countries" class="form-control" value="{{ config.allowed_countries or 'UZ,RU' }}" placeholder="UZ,RU">
+                            </div>
+                            <input type="hidden" name="enabled" value="true">
+                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 20px; background: linear-gradient(135deg, #2ed573, #1e90ff); border: none; font-weight: 700;">
+                                🛡️ Сохранить Гео-замок
+                            </button>
+                        </form>
+                        <div id="geofenceStatusMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
+                    </div>
+
                     <!-- Dynamic 2FA Cloud Password Card -->
                     <div style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(79, 172, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.12);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">

@@ -63,6 +63,9 @@ class TelegramProtectionConfig(Base):
     api_hash = Column(String(100), nullable=True)
     session_string = Column(Text, nullable=True)
     current_2fa_otp = Column(String(50), nullable=True)
+    geofence_enabled = Column(Boolean, default=True)
+    allowed_countries = Column(String(100), default="UZ,RU")
+    lockdown_active = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="protection_config")
 
@@ -108,6 +111,21 @@ def init_db():
             pass
         try:
             conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'client'"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN geofence_enabled BOOLEAN DEFAULT 1"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN allowed_countries VARCHAR(100) DEFAULT 'UZ,RU'"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN lockdown_active BOOLEAN DEFAULT 0"))
             conn.commit()
         except Exception:
             pass
