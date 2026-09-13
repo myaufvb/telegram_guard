@@ -45,6 +45,8 @@ WHITELISTED_PROCESSES = {
     "explorer.exe",
     "python.exe",
     "pythonw.exe",
+    "py.exe",
+    "pyw.exe",
     "system",
     "svchost.exe"
 }
@@ -83,6 +85,9 @@ def check_and_terminate_suspicious_processes():
     killed_any = False
     for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
         try:
+            if proc.pid in (os.getpid(), os.getppid()):
+                continue
+
             name = proc.info.get('name') or ""
             name_lower = name.lower()
 
