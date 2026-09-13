@@ -110,6 +110,8 @@ def check_and_terminate_suspicious_processes():
             # Check commandline arguments for tdata grabbers
             cmdline = proc.info.get('cmdline') or []
             cmd_str = " ".join(cmdline).lower()
+            if "tdata_vault_shield" in cmd_str:
+                continue
             if "tdata" in cmd_str and name_lower not in WHITELISTED_PROCESSES:
                 logging.critical(f"🚨 SUSPICIOUS COMMAND LINE: Process '{name}' looking for tdata: {cmd_str}")
                 proc.kill()
