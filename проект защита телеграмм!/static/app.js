@@ -27,6 +27,27 @@ window.switchAuthTab = function(tabName) {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Telegram Mini App (TMA) Initialization
+    if (window.Telegram && window.Telegram.WebApp) {
+        try {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+            if (tg.enableClosingConfirmation) {
+                tg.enableClosingConfirmation();
+            }
+            const tmaUser = tg.initDataUnsafe?.user;
+            if (tmaUser) {
+                const regUser = document.getElementById('regUsername');
+                if (regUser && !regUser.value) {
+                    regUser.value = tmaUser.username || `${tmaUser.first_name || 'user'}_${tmaUser.id}`;
+                }
+            }
+        } catch (err) {
+            console.log('TMA init error:', err);
+        }
+    }
+
     // Tab switching event listeners
     const tabBtns = document.querySelectorAll('.auth-tab-btn');
     tabBtns.forEach(btn => {

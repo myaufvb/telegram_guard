@@ -16,7 +16,7 @@ async def run_web():
 
 async def run_bot():
     """Starts Telegram Bot polling"""
-    logging.info("Starting Telegram Bot @Defense_telegram_lerman_bot...")
+    logging.info("Starting Telegram Bot @teelegram_guard_bot...")
     try:
         await dp.start_polling(bot)
     except Exception as e:
