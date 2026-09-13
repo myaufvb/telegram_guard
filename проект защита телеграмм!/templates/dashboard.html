@@ -252,6 +252,74 @@
                         </form>
                         <div id="duressPwdStatusMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
                     </div>
+
+                    <!-- ZERO-TRUST WEB & QR-LOGIN BLOCKER CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(235, 77, 75, 0.08), rgba(255, 121, 121, 0.04)); border: 1px solid #ff4757; padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(255, 71, 87, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: #ff4757; display: flex; align-items: center; gap: 8px;">
+                                <span>🚫</span> Zero-Trust Web & QR-Login Blocker
+                            </h3>
+                            {% if config.block_web_logins %}
+                                <span class="badge badge-success">🟢 Блокировка Web/QR АКТИВНА</span>
+                            {% else %}
+                                <span class="badge badge-warning">⚪ Отключена</span>
+                            {% endif %}
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.2rem; line-height: 1.5;">
+                            Защищает от фишинговых сайтов и фальшивых QR-кодов («голосуй за конкурс», «премиум бесплатно»). Все браузерные сессии (Telegram WebZ, WebK, Chrome, Safari) уничтожаются за 1 секунду!
+                        </p>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" onclick="toggleWebBlock(true, 0)" class="btn btn-danger" style="width: auto; padding: 10px 18px; font-weight: 700;">
+                                🛡️ Включить блокировку Web
+                            </button>
+                            <button type="button" onclick="toggleWebBlock(true, 15)" class="btn btn-secondary" style="width: auto; padding: 10px 18px; color: #ffa502; border-color: #ffa502;">
+                                ⏱️ Разрешить Web на 15 мин
+                            </button>
+                            <button type="button" onclick="toggleWebBlock(false, 0)" class="btn btn-secondary" style="width: auto; padding: 10px 14px;">
+                                Отключить
+                            </button>
+                            <span id="webBlockStatusMsg" style="font-size: 0.88rem;"></span>
+                        </div>
+                    </div>
+
+                    <!-- SAVED MESSAGES HONEYTOKEN CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(255, 165, 2, 0.08), rgba(255, 211, 42, 0.04)); border: 1px solid #ffa502; padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(255, 165, 2, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: #ffa502; display: flex; align-items: center; gap: 8px;">
+                                <span>🪤</span> Honeytoken в «Избранном» (Saved Messages Trap)
+                            </h3>
+                            <span class="badge badge-success">🛡️ Сторож Избранного</span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.2rem; line-height: 1.5;">
+                            Хакеры сразу лезут в «Избранное» искать пароли и seed-фразы. Эта функция создает в «Избранном» реалистичную приманку с шифрованной ссылкой. Если вор откроет её — сервер моментально <strong>убивает сессию хакера</strong> и блокирует аккаунт!
+                        </p>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" onclick="plantSavedMessagesHoneytoken()" class="btn" style="background: linear-gradient(135deg, #ffa502, #ff6348); color: #fff; font-weight: 700; padding: 12px 22px; border: none; border-radius: 8px; box-shadow: 0 0 15px rgba(255, 165, 2, 0.4); cursor: pointer;">
+                                🪤 Установить Honeytoken в Избранное
+                            </button>
+                            <span id="savedHoneytokenMsg" style="font-size: 0.88rem;"></span>
+                        </div>
+                    </div>
+
+                    <!-- FAKE-PROFILE CLONE DETECTOR CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(30, 144, 255, 0.08), rgba(0, 210, 211, 0.04)); border: 1px solid #1e90ff; padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(30, 144, 255, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: #1e90ff; display: flex; align-items: center; gap: 8px;">
+                                <span>👥</span> Детектор Фейковых Клонов (Anti-Impersonator)
+                            </h3>
+                            <span class="badge badge-success">🔍 Сканер профилей</span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.2rem; line-height: 1.5;">
+                            Сканирует диалоги и чаты на наличие аккаунтов-мошенников, копирующих ваше имя, фамилию или никнейм для выманивания денег у ваших знакомых.
+                        </p>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" onclick="scanFakeClones()" class="btn btn-primary" style="width: auto; padding: 12px 22px; background: linear-gradient(135deg, #1e90ff, #00d2d3); border: none; font-weight: 700;">
+                                🔍 Проверить аккаунт на наличие клонов
+                            </button>
+                            <span id="clonesScanStatusMsg" style="font-size: 0.88rem;"></span>
+                        </div>
+                        <div id="clonesResultsBox" style="margin-top: 15px; display: none;"></div>
+                    </div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
                             <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
                                 <span>🔑</span> Динамический Облачный Пароль (2FA Telegram)
@@ -459,6 +527,56 @@
                             <button type="submit" class="btn btn-secondary" style="padding: 10px 20px;">Обновить пароль</button>
                             <div id="changeWebPwdMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
                         </form>
+                    </div>
+
+                    <!-- EMERGENCY SMS KILL-SWITCH CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(235, 77, 75, 0.08), rgba(255, 71, 87, 0.04)); border: 1px solid #eb4d4b; padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(235, 77, 75, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: #eb4d4b; display: flex; align-items: center; gap: 8px;">
+                                <span>📱</span> Emergency SMS Kill-Switch (Сброс сессий по СМС)
+                            </h3>
+                            {% if user.emergency_trusted_phone and user.sms_kill_code %}
+                                <span class="badge badge-success">✅ Настроен ({{ user.emergency_trusted_phone }})</span>
+                            {% else %}
+                                <span class="badge badge-warning">⚠️ Не настроен</span>
+                            {% endif %}
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.2rem; line-height: 1.5;">
+                            Если вас взломали, удалили Telegram с телефона и вы на улице без интернета/ПК: отправка одного SMS с секретным кодом мгновенно замораживает ваш Telegram и сбрасывает все чужие устройства!
+                        </p>
+                        <form id="smsKillConfigForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
+                                <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Доверенный телефон (ваш запасной или родственника)</label>
+                                <input type="text" id="emergencyPhoneInput" name="emergency_phone" class="form-control" placeholder="+998901234567" value="{{ user.emergency_trusted_phone or '' }}" required>
+                            </div>
+                            <div style="width: 180px;">
+                                <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Секретный SMS-код</label>
+                                <input type="text" id="smsKillCodeInput" name="secret_code" class="form-control" placeholder="KILL-SEC" value="{{ user.sms_kill_code or '' }}">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 20px; background: linear-gradient(135deg, #eb4d4b, #ff7979); border: none; font-weight: 700;">
+                                💾 Сохранить SMS Kill-Switch
+                            </button>
+                        </form>
+                        <div id="smsKillStatusMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
+                    </div>
+
+                    <!-- WEBAUTHN / BIOMETRICS / YUBIKEY CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(46, 213, 115, 0.08), rgba(0, 242, 254, 0.04)); border: 1px solid var(--accent-green); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(46, 213, 115, 0.08);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
+                                <span>👆</span> Вход по биометрии (Touch ID / Face ID / Windows Hello / YubiKey)
+                            </h3>
+                            <span class="badge badge-success">🔐 FIDO2 / Passkey</span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.2rem; line-height: 1.5;">
+                            Привяжите отпечаток пальца, сканер лица или аппаратный ключ YubiKey. Вы сможете входить в личный кабинет в 1 касание без ввода пароля, а вирусы-кейлоггеры никогда не смогут перехватить доступ!
+                        </p>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" onclick="registerWebAuthnBiometrics()" class="btn" style="background: linear-gradient(135deg, #2ed573, #1e90ff); color: #fff; font-weight: 700; padding: 12px 22px; border: none; border-radius: 8px; box-shadow: 0 0 15px rgba(46, 213, 115, 0.4); cursor: pointer;">
+                                🔑 Зарегистрировать Face ID / Touch ID / Ключ
+                            </button>
+                            <span id="webauthnRegStatusMsg" style="font-size: 0.88rem;"></span>
+                        </div>
                     </div>
                 </div>
 

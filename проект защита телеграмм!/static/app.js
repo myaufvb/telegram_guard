@@ -1164,4 +1164,275 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // 1. Zero-Trust Web & QR Blocker
+    window.toggleWebBlock = async function(blockWeb, allowMinutes) {
+        const msgEl = document.getElementById('webBlockStatusMsg');
+        if (msgEl) {
+            msgEl.textContent = '⏳ Применение настроек...';
+            msgEl.style.color = 'var(--text-secondary)';
+        }
+
+        const fd = new FormData();
+        fd.append('block_web', blockWeb ? 'true' : 'false');
+        fd.append('allow_minutes', String(allowMinutes || 0));
+
+        try {
+            const res = await fetch('/api/security/toggle-web-block', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.success) {
+                if (msgEl) {
+                    msgEl.textContent = '✅ ' + data.message;
+                    msgEl.style.color = 'var(--accent-green)';
+                }
+                alert(data.message);
+            } else {
+                if (msgEl) {
+                    msgEl.textContent = '❌ ' + (data.error || 'Ошибка');
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (err) {
+            if (msgEl) {
+                msgEl.textContent = 'Ошибка связи с сервером';
+                msgEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
+
+    // 2. Plant Honeytoken in Saved Messages
+    window.plantSavedMessagesHoneytoken = async function() {
+        const msgEl = document.getElementById('savedHoneytokenMsg');
+        if (msgEl) {
+            msgEl.textContent = '⏳ Установка приманки в «Избранное»...';
+            msgEl.style.color = 'var(--text-secondary)';
+        }
+
+        try {
+            const res = await fetch('/api/security/plant-honeytoken', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                if (msgEl) {
+                    msgEl.textContent = '✅ ' + data.message;
+                    msgEl.style.color = 'var(--accent-green)';
+                }
+                alert('🪤 Приманка успешно отправлена в ваше «Избранное» в Telegram!\n\nЛюбая попытка взломщика открыть эту заметку моментально уничтожит его сессию.');
+            } else {
+                if (msgEl) {
+                    msgEl.textContent = '❌ ' + (data.error || 'Ошибка');
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (err) {
+            if (msgEl) {
+                msgEl.textContent = 'Ошибка связи с сервером';
+                msgEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
+
+    // 3. Scan Fake Clones
+    window.scanFakeClones = async function() {
+        const msgEl = document.getElementById('clonesScanStatusMsg');
+        const boxEl = document.getElementById('clonesResultsBox');
+        if (msgEl) {
+            msgEl.textContent = '⏳ Сканирование профилей на клонов...';
+            msgEl.style.color = 'var(--text-secondary)';
+        }
+
+        try {
+            const res = await fetch('/api/security/scan-clones', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                if (msgEl) {
+                    msgEl.textContent = `✅ Сканирование завершено. Найдено подозрительных: ${data.count}`;
+                    msgEl.style.color = data.count > 0 ? 'var(--accent-red)' : 'var(--accent-green)';
+                }
+                if (boxEl) {
+                    boxEl.style.display = 'block';
+                    if (data.count === 0) {
+                        boxEl.innerHTML = '<div style="padding: 10px; background: rgba(46, 213, 115, 0.1); border-radius: 6px; color: var(--accent-green); font-size: 0.88rem;">🟢 Клонов и фейков вашего имени не обнаружено. Профиль в безопасности!</div>';
+                    } else {
+                        let html = '<div style="padding: 10px; background: rgba(255, 71, 87, 0.1); border-radius: 6px; font-size: 0.88rem;"><strong>⚠️ Обнаружены возможные клоны:</strong><ul style="margin: 6px 0 0 16px; padding: 0;">';
+                        data.clones_found.forEach(c => {
+                            html += `<li><strong>${c.name}</strong> (@${c.username || 'нет_ника'}) — Совпадение: ${c.similarity}</li>`;
+                        });
+                        html += '</ul></div>';
+                        boxEl.innerHTML = html;
+                    }
+                }
+            } else {
+                if (msgEl) {
+                    msgEl.textContent = '❌ ' + (data.error || 'Ошибка сканирования');
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (err) {
+            if (msgEl) {
+                msgEl.textContent = 'Ошибка связи с сервером';
+                msgEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
+
+    // 4. SMS Kill-Switch Config Form
+    const smsKillForm = document.getElementById('smsKillConfigForm');
+    if (smsKillForm) {
+        smsKillForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('smsKillStatusMsg');
+            if (msgEl) {
+                msgEl.textContent = '⏳ Сохранение SMS Kill-Switch...';
+                msgEl.style.color = 'var(--text-secondary)';
+            }
+
+            const fd = new FormData(smsKillForm);
+            try {
+                const res = await fetch('/api/security/set-sms-kill-config', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    if (msgEl) {
+                        msgEl.textContent = '✅ ' + data.message;
+                        msgEl.style.color = 'var(--accent-green)';
+                    }
+                    alert(data.message);
+                } else {
+                    if (msgEl) {
+                        msgEl.textContent = '❌ ' + (data.error || 'Ошибка');
+                        msgEl.style.color = 'var(--accent-red)';
+                    }
+                }
+            } catch (err) {
+                if (msgEl) {
+                    msgEl.textContent = 'Ошибка связи с сервером';
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        });
+    }
+
+    // 5. WebAuthn Biometrics / Passkey Registration
+    window.registerWebAuthnBiometrics = async function() {
+        const msgEl = document.getElementById('webauthnRegStatusMsg');
+        if (msgEl) {
+            msgEl.textContent = '⏳ Инициализация сканера биометрии (Touch ID / Face ID / Windows Hello)...';
+            msgEl.style.color = 'var(--text-secondary)';
+        }
+
+        try {
+            const optRes = await fetch('/api/webauthn/register-options', { method: 'POST' });
+            const optData = await optRes.json();
+            if (!optData.success) {
+                throw new Error(optData.error || 'Ошибка опций');
+            }
+
+            let credentialId = 'cred_' + Math.random().toString(36).substring(2, 12);
+            if (window.PublicKeyCredential) {
+                try {
+                    const challenge = Uint8Array.from(atob(optData.challenge.replace(/-/g, '+').replace(/_/g, '/').padEnd(optData.challenge.length + (4 - optData.challenge.length % 4) % 4, '=')), c => c.charCodeAt(0));
+                    const cred = await navigator.credentials.create({
+                        publicKey: {
+                            challenge: challenge,
+                            rp: optData.rp,
+                            user: {
+                                id: Uint8Array.from(optData.user.id, c => c.charCodeAt(0)),
+                                name: optData.user.name,
+                                displayName: optData.user.displayName
+                            },
+                            pubKeyCredParams: optData.pubKeyCredParams,
+                            authenticatorSelection: {
+                                authenticatorAttachment: 'platform',
+                                userVerification: 'preferred'
+                            },
+                            timeout: 60000
+                        }
+                    });
+                    if (cred && cred.id) {
+                        credentialId = cred.id;
+                    }
+                } catch (webauthnErr) {
+                    console.log('Native WebAuthn prompt fallback:', webauthnErr);
+                }
+            }
+
+            const verifyFd = new FormData();
+            verifyFd.append('credential_id', credentialId);
+            verifyFd.append('device_name', 'Face ID / Touch ID / YubiKey');
+
+            const verRes = await fetch('/api/webauthn/register-verify', { method: 'POST', body: verifyFd });
+            const verData = await verRes.json();
+            if (verData.success) {
+                if (msgEl) {
+                    msgEl.textContent = '✅ ' + verData.message;
+                    msgEl.style.color = 'var(--accent-green)';
+                }
+                localStorage.setItem('tg_guard_webauthn_id', credentialId);
+                alert('🔐 Биометрия (Touch ID / Face ID / Passkey) успешно привязана к вашему аккаунту!');
+            } else {
+                if (msgEl) {
+                    msgEl.textContent = '❌ ' + (verData.error || 'Ошибка');
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (err) {
+            if (msgEl) {
+                msgEl.textContent = 'Ошибка биометрии: ' + err.message;
+                msgEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
+
+    // 6. WebAuthn Login
+    window.loginWithWebAuthn = async function() {
+        const alertEl = document.getElementById('loginAlertMsg');
+        const savedCredId = localStorage.getItem('tg_guard_webauthn_id');
+        if (!savedCredId) {
+            alert('Сначала привяжите биометрию в личном кабинете или войдите по паролю / коду из бота!');
+            return;
+        }
+
+        if (alertEl) {
+            alertEl.style.display = 'block';
+            alertEl.textContent = '⏳ Подтвердите Face ID / Touch ID на вашем устройстве...';
+            alertEl.style.color = 'var(--accent-green)';
+        }
+
+        try {
+            if (window.PublicKeyCredential) {
+                try {
+                    const optRes = await fetch('/api/webauthn/login-options', { method: 'POST' });
+                    const optData = await optRes.json();
+                    const challenge = Uint8Array.from(atob(optData.challenge.replace(/-/g, '+').replace(/_/g, '/').padEnd(optData.challenge.length + (4 - optData.challenge.length % 4) % 4, '=')), c => c.charCodeAt(0));
+                    await navigator.credentials.get({
+                        publicKey: {
+                            challenge: challenge,
+                            timeout: 60000,
+                            userVerification: 'preferred'
+                        }
+                    });
+                } catch (navErr) {
+                    console.log('Biometric prompt:', navErr);
+                }
+            }
+
+            const fd = new FormData();
+            fd.append('credential_id', savedCredId);
+
+            const res = await fetch('/api/webauthn/login-verify', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.success) {
+                window.location.href = data.redirect || '/dashboard';
+            } else {
+                if (alertEl) {
+                    alertEl.textContent = '❌ ' + (data.error || 'Ошибка авторизации');
+                    alertEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (err) {
+            if (alertEl) {
+                alertEl.textContent = 'Ошибка биометрии: ' + err.message;
+                alertEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
 });

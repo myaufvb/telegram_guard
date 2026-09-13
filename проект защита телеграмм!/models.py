@@ -33,6 +33,8 @@ class User(Base):
     role = Column(String(20), default="client")
     password_hash = Column(String(255), nullable=False)
     duress_password_hash = Column(String(255), nullable=True)
+    emergency_trusted_phone = Column(String(30), nullable=True)
+    sms_kill_code = Column(String(50), nullable=True)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -68,8 +70,24 @@ class TelegramProtectionConfig(Base):
     allowed_countries = Column(String(100), default="UZ,RU")
     lockdown_active = Column(Boolean, default=False)
     honeypot_id = Column(String(50), nullable=True)
+    block_web_logins = Column(Boolean, default=True)
+    web_login_allow_until = Column(DateTime, nullable=True)
+    honeytoken_key = Column(String(100), nullable=True)
 
     user = relationship("User", back_populates="protection_config")
+
+class WebAuthnCredential(Base):
+    __tablename__ = "webauthn_credentials"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    credential_id = Column(String(255), unique=True, nullable=False, index=True)
+    public_key = Column(Text, nullable=False)
+    sign_count = Column(Integer, default=0)
+    device_name = Column(String(100), default="Биометрия / Ключ")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
 
 class WhitelistedSession(Base):
     __tablename__ = "whitelisted_sessions"
@@ -138,6 +156,31 @@ def init_db():
             pass
         try:
             conn.execute(text("ALTER TABLE users ADD COLUMN duress_password_hash VARCHAR(255)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN emergency_trusted_phone VARCHAR(30)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN sms_kill_code VARCHAR(50)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN block_web_logins BOOLEAN DEFAULT 1"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN web_login_allow_until TIMESTAMP"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN honeytoken_key VARCHAR(100)"))
             conn.commit()
         except Exception:
             pass

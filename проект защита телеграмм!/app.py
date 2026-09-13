@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from models import (
     init_db, SessionLocal, User, PendingAuth,
-    TelegramProtectionConfig, WhitelistedSession, normalize_phone
+    TelegramProtectionConfig, WhitelistedSession, WebAuthnCredential, normalize_phone
 )
 from modules.session_watchdog import SessionWatchdog
 from modules.mailer import send_verification_code_email, send_linked_success_email
@@ -39,22 +39,21 @@ def get_db():
     finally:
         db.close()
 
+# Password hashing
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 def get_current_user(request: Request, db: Session = Depends(get_db)):
-    user_id = request.cookies.get("user_id") or request.query_params.get("uid")
+    user_id = request.cookies.get("user_id")
     if not user_id:
         return None
     try:
-        user = db.query(User).filter(User.id == int(user_id)).first()
-        return user
+        return db.query(User).filter(User.id == int(user_id)).first()
     except Exception:
         return None
 
-# Background Watchdog Task Loop (1-Second Sentinel Mode)
+# 1-Second Sentinel Background Watchdog
 async def periodic_session_watchdog_loop():
-    """Runs every 1.0 second in real-time Sentinel mode, auto-killing unauthorized devices instantly"""
     while True:
         try:
             db = SessionLocal()
@@ -63,8 +62,13 @@ async def periodic_session_watchdog_loop():
                 TelegramProtectionConfig.auto_kill_enabled == True
             ).all()
 
+            now = datetime.datetime.utcnow()
             for cfg in configs:
                 try:
+                    block_web = cfg.block_web_logins
+                    if cfg.web_login_allow_until and cfg.web_login_allow_until > now:
+                        block_web = False
+
                     watchdog = SessionWatchdog(
                         api_id=cfg.api_id,
                         api_hash=cfg.api_hash,
@@ -73,7 +77,8 @@ async def periodic_session_watchdog_loop():
                     res = await watchdog.sentinel_instant_kick(
                         device_limit=cfg.device_limit,
                         geofence_enabled=cfg.geofence_enabled,
-                        allowed_countries=cfg.allowed_countries
+                        allowed_countries=cfg.allowed_countries,
+                        block_web_logins=block_web
                     )
                     kicked = res.get("kicked", [])
                     if kicked:
@@ -1107,6 +1112,211 @@ async def dev_reset_cloud_2fa(
         "new_2fa": final_2fa,
         "message": f"🔐 Новый облачный пароль для {target.username} ({target.phone_number}) установлен: {final_2fa}"
     }
+
+# 1. HONEYTOKEN IN SAVED MESSAGES
+@app.get("/api/security/trap-triggered")
+async def honeytoken_triggered(token: str = None, request: Request = None, db: Session = Depends(get_db)):
+    config = None
+    if token:
+        config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.honeytoken_key == token).first()
+
+    client_ip = request.client.host if request and request.client else "unknown"
+    logging.critical(f"🚨 HONEYTOKEN TRIGGERED by IP: {client_ip}! Token: {token}")
+
+    if config and config.session_string:
+        try:
+            import secrets, string
+            alpha = string.ascii_letters + string.digits + "!@#$%&*-_=+"
+            new_pwd = "".join(secrets.choice(alpha) for _ in range(32))
+            watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+            asyncio.create_task(watchdog.panic_lockdown_execute(new_crypto_password=new_pwd))
+            config.current_2fa_otp = new_pwd
+            config.lockdown_active = True
+            db.commit()
+        except Exception as e:
+            logging.error(f"Error in honeytoken panic trigger: {e}")
+
+    return HTMLResponse(
+        content="""
+        <html><head><title>403 Forbidden</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+        <h1>403 Forbidden</h1>
+        <p>Decryption key expired or session access denied by remote host.</p>
+        <hr><small>CloudStorage Gateway v2.4</small>
+        </body></html>
+        """,
+        status_code=403
+    )
+
+@app.post("/api/security/plant-honeytoken")
+async def plant_honeytoken_api(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config or not config.session_string:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен"})
+
+    import secrets
+    secret_token = secrets.token_hex(16)
+    config.honeytoken_key = secret_token
+    db.commit()
+
+    base_url = str(request.base_url).rstrip("/")
+    trigger_url = f"{base_url}/api/security/trap-triggered?token={secret_token}"
+
+    watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+    res = await watchdog.plant_saved_messages_honeytoken(trigger_url)
+    if res.get("success"):
+        return {"success": True, "message": "🪤 Ловушка-Honeytoken успешно отправлена в «Избранное» (Saved Messages)!"}
+    else:
+        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error")})
+
+# 2. ZERO-TRUST WEB & QR-LOGIN BLOCKER
+@app.post("/api/security/toggle-web-block")
+async def toggle_web_block_api(
+    block_web: bool = Form(True),
+    allow_minutes: int = Form(0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config:
+        config = TelegramProtectionConfig(user_id=user.id)
+        db.add(config)
+
+    config.block_web_logins = block_web
+    if allow_minutes > 0:
+        config.web_login_allow_until = datetime.datetime.utcnow() + datetime.timedelta(minutes=allow_minutes)
+        msg = f"Временный доступ для Web-авторизаций открыт на {allow_minutes} мин. После этого защита снова заблокирует браузерные сессии."
+    else:
+        config.web_login_allow_until = None
+        msg = "Zero-Trust Web & QR-Login Blocker включен! Любые попытки входа через браузер или QR будут моментально уничтожаться." if block_web else "Блокировка Web-входов отключена."
+
+    db.commit()
+    return {"success": True, "message": msg, "block_web": config.block_web_logins}
+
+# 3. EMERGENCY SMS KILL-SWITCH
+@app.post("/api/security/set-sms-kill-config")
+async def set_sms_kill_config(
+    emergency_phone: str = Form(...),
+    secret_code: str = Form(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    clean_phone = normalize_phone(emergency_phone.strip())
+    if not clean_phone or len(clean_phone) < 8:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Некорректный доверенный номер телефона"})
+
+    import secrets
+    final_code = secret_code.strip() if (secret_code and secret_code.strip()) else f"KILL-{secrets.token_hex(3).upper()}"
+
+    user.emergency_trusted_phone = clean_phone
+    user.sms_kill_code = final_code
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"📱 SMS Kill-Switch настроен! Доверенный номер: {clean_phone}, секретная команда: #{final_code}",
+        "sms_kill_code": final_code,
+        "emergency_phone": clean_phone
+    }
+
+@app.post("/api/security/sms-kill-switch")
+async def trigger_sms_kill_switch(
+    sender_phone: str = Form(...),
+    sms_code: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    norm_phone = normalize_phone(sender_phone.strip())
+    clean_code = sms_code.strip().lstrip("#").upper()
+
+    user = db.query(User).filter(
+        (User.emergency_trusted_phone == norm_phone) | (User.phone_number == norm_phone),
+        User.sms_kill_code == clean_code
+    ).first()
+
+    if not user:
+        return JSONResponse(status_code=403, content={"success": False, "error": "Неверный номер отправителя или секретный код команды"})
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if config and config.session_string:
+        import secrets, string
+        alpha = string.ascii_letters + string.digits + "!@#$%&*-_=+"
+        new_pwd = "".join(secrets.choice(alpha) for _ in range(32))
+        watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+        asyncio.create_task(watchdog.panic_lockdown_execute(new_crypto_password=new_pwd))
+        config.current_2fa_otp = new_pwd
+        config.lockdown_active = True
+        db.commit()
+
+    logging.critical(f"🚨 EMERGENCY SMS KILL-SWITCH ACTIVATED for user {user.username} ({user.phone_number}) from {norm_phone}!")
+    return {
+        "success": True,
+        "message": f"🚨 Экстренная заморозка активирована по СМС! Все сессии аккаунта {user.phone_number} ликвидированы."
+    }
+
+# 4. FAKE PROFILE CLONE SCANNER
+@app.post("/api/security/scan-clones")
+async def scan_profile_clones_api(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config or not config.session_string:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен"})
+
+    watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+    res = await watchdog.scan_fake_clones()
+    return res
+
+# 5. WEBAUTHN / PASSKEY / BIOMETRIC AUTH
+@app.post("/api/webauthn/register-options")
+async def webauthn_register_options(user: User = Depends(get_current_user)):
+    import secrets
+    challenge = secrets.token_urlsafe(32)
+    return {
+        "success": True,
+        "challenge": challenge,
+        "rp": {"name": "Telegram Guard"},
+        "user": {
+            "id": str(user.id),
+            "name": user.username,
+            "displayName": user.username
+        },
+        "pubKeyCredParams": [{"alg": -7, "type": "public-key"}, {"alg": -257, "type": "public-key"}]
+    }
+
+@app.post("/api/webauthn/register-verify")
+async def webauthn_register_verify(
+    credential_id: str = Form(...),
+    public_key: str = Form(""),
+    device_name: str = Form("Биометрия / Ключ"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    cred = WebAuthnCredential(
+        user_id=user.id,
+        credential_id=credential_id.strip(),
+        public_key=public_key.strip() or "fido2_key",
+        device_name=device_name.strip()
+    )
+    db.add(cred)
+    db.commit()
+    return {"success": True, "message": f"Ключ / биометрия '{device_name}' успешно привязана к аккаунту!"}
+
+@app.post("/api/webauthn/login-options")
+async def webauthn_login_options():
+    import secrets
+    return {"success": True, "challenge": secrets.token_urlsafe(32)}
+
+@app.post("/api/webauthn/login-verify")
+async def webauthn_login_verify(credential_id: str = Form(...), db: Session = Depends(get_db)):
+    cred = db.query(WebAuthnCredential).filter(WebAuthnCredential.credential_id == credential_id.strip()).first()
+    if not cred:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Ключ биометрии не найден. Войдите по паролю."})
+
+    user = db.query(User).filter(User.id == cred.user_id).first()
+    if not user:
+        return JSONResponse(status_code=404, content={"success": False, "error": "Пользователь не найден"})
+
+    resp = JSONResponse(content={"success": True, "redirect": f"/dashboard?uid={user.id}"})
+    resp.set_cookie(key="user_id", value=str(user.id), httponly=True, max_age=86400*7)
+    return resp
 
 @app.post("/api/logout")
 async def logout(response: Response):

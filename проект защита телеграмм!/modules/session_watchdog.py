@@ -316,12 +316,13 @@ class SessionWatchdog:
         finally:
             await client.disconnect()
 
-    async def sentinel_instant_kick(self, device_limit: int = 2, geofence_enabled: bool = False, allowed_countries: str = "UZ,RU"):
+    async def sentinel_instant_kick(self, device_limit: int = 2, geofence_enabled: bool = False, allowed_countries: str = "UZ,RU", block_web_logins: bool = False):
         """
-        1-Second Sentinel Watchdog:
-        Inspects active authorizations and immediately terminates ANY session:
-        1. Exceeding device limit.
-        2. Connecting from unauthorized foreign countries if geofence is enabled.
+        Ultra-fast sentinel check:
+        1. Zero-Trust Web & QR-login check
+        2. Geo-fence validation
+        3. Device limit enforcement
+        Immediately terminates violators using ResetAuthorizationRequest.
         """
         if not self.session_string:
             return {"status": "no_session"}
@@ -339,10 +340,32 @@ class SessionWatchdog:
             kicked_sessions = []
             non_current = [a for a in auths if not a.current]
 
+            # 0. Zero-Trust Web & QR-Login Blocker
+            if block_web_logins:
+                web_keywords = ["web", "webz", "webk", "chrome", "firefox", "safari", "opera", "edge", "browser"]
+                for a in non_current:
+                    model = (a.device_model or "").lower()
+                    app = (a.app_name or "").lower()
+                    platform = (a.platform or "").lower()
+                    if any(w in model or w in app or w in platform for w in web_keywords):
+                        try:
+                            await client(ResetAuthorizationRequest(hash=a.hash))
+                            kicked_sessions.append({
+                                "device": a.device_model,
+                                "ip": a.ip,
+                                "country": a.country,
+                                "reason": "web_qr_blocked"
+                            })
+                            logging.critical(f"🚫 ZERO-TRUST WEB/QR BLOCKED: Terminated session '{a.device_model}' / '{a.app_name}' (IP: {a.ip})")
+                        except Exception as ex:
+                            logging.error(f"Web/QR reset error: {ex}")
+
             # 1. Geo-fence validation
             if geofence_enabled and allowed_countries:
                 allowed = [c.strip().upper() for c in allowed_countries.split(",") if c.strip()]
                 for a in non_current:
+                    if any(k.get("ip") == a.ip for k in kicked_sessions):
+                        continue
                     country_upper = (a.country or "").strip().upper()
                     if country_upper and not any(al in country_upper for al in allowed):
                         try:
@@ -450,6 +473,87 @@ class SessionWatchdog:
             return {"success": True, "honeypot_id": channel_id}
         except Exception as e:
             logging.error(f"Error creating honeypot: {e}")
+            return {"success": False, "error": str(e)}
+        finally:
+            await client.disconnect()
+
+    async def plant_saved_messages_honeytoken(self, webhook_trigger_url: str):
+        """Plants a bait message in Telegram Saved Messages (me dialog)."""
+        if not self.session_string:
+            return {"success": False, "error": "Мониторинг Telegram не подключен"}
+
+        client = self._create_client()
+        await client.connect()
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            return {"success": False, "error": "Сессия не авторизована"}
+
+        try:
+            bait_text = (
+                "🔐 **РЕЗЕРВНЫЙ АРХИВ ПАРОЛЕЙ И КРИПТОКОШЕЛЬКОВ (НЕ УДАЛЯТЬ)**\n\n"
+                "• Seed-фраза (Metamask/Trust): `abandon ability able about above absent absorb abstract abuse accept access accident`\n"
+                "• Приватный ключ BTC: `5Kb8kLf9zgWQnogidDA76MzPL6TsZZY36hWXMssSzNydYXYB9KF`\n"
+                "• Пароль от банковских карт и хранилища документов:\n"
+                f"👉 [Открыть расшифрованный архив документов]({webhook_trigger_url})\n\n"
+                "⚠️ *Примечание: Ссылка синхронизирована с приватным облачным хранилищем.*"
+            )
+            sent_msg = await client.send_message("me", bait_text)
+            return {"success": True, "message_id": sent_msg.id}
+        except Exception as e:
+            logging.error(f"Error planting honeytoken in Saved Messages: {e}")
+            return {"success": False, "error": str(e)}
+        finally:
+            await client.disconnect()
+
+    async def scan_fake_clones(self):
+        """Scans dialogs and contacts to find potential impostors/clones with similar names."""
+        if not self.session_string:
+            return {"success": False, "error": "Мониторинг Telegram не подключен"}
+
+        client = self._create_client()
+        await client.connect()
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            return {"success": False, "error": "Сессия не авторизована"}
+
+        try:
+            me = await client.get_me()
+            my_first = (me.first_name or "").lower()
+            my_last = (me.last_name or "").lower()
+            my_username = (me.username or "").lower()
+
+            found_clones = []
+            async for dialog in client.iter_dialogs(limit=100):
+                entity = dialog.entity
+                if hasattr(entity, 'id') and entity.id != me.id and getattr(entity, 'first_name', None):
+                    e_first = (entity.first_name or "").lower()
+                    e_last = (getattr(entity, 'last_name', '') or "").lower()
+                    e_user = (getattr(entity, 'username', '') or "").lower()
+
+                    similarity = 0
+                    if my_first and e_first == my_first and len(my_first) > 2:
+                        similarity += 50
+                    if my_last and e_last == my_last and len(my_last) > 2:
+                        similarity += 30
+                    if my_username and e_user and (e_user in my_username or my_username in e_user) and e_user != my_username:
+                        similarity += 50
+
+                    if similarity >= 50:
+                        found_clones.append({
+                            "id": entity.id,
+                            "name": f"{entity.first_name or ''} {getattr(entity, 'last_name', '') or ''}".strip(),
+                            "username": getattr(entity, 'username', None),
+                            "similarity": f"{similarity}%"
+                        })
+
+            return {
+                "success": True,
+                "my_profile": f"{me.first_name or ''} {me.last_name or ''}".strip(),
+                "clones_found": found_clones,
+                "count": len(found_clones)
+            }
+        except Exception as e:
+            logging.error(f"Error scanning clones: {e}")
             return {"success": False, "error": str(e)}
         finally:
             await client.disconnect()
