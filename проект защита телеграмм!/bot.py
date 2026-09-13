@@ -12,7 +12,12 @@ from aiogram.types import (
 )
 from models import SessionLocal, PendingAuth, normalize_phone
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8847343202:AAFc4CwRkDVktUgHEaY-zhEVbpJOy3tZdgg")
+env_token = os.getenv("BOT_TOKEN", "")
+if not env_token or "8969572909" in env_token:
+    BOT_TOKEN = "8847343202:AAFc4CwRkDVktUgHEaY-zhEVbpJOy3tZdgg"
+else:
+    BOT_TOKEN = env_token
+
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://telegram-guard-cxa5.onrender.com")
 
 bot = Bot(token=BOT_TOKEN)
