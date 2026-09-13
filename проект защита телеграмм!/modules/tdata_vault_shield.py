@@ -13,6 +13,15 @@ import subprocess
 import threading
 from datetime import datetime
 
+# Enforce UTF-8 on Windows Console
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
+
 # Configure logging
 LOG_DIR = os.path.join(os.path.expanduser("~"), ".telegram_guard")
 os.makedirs(LOG_DIR, exist_ok=True)
