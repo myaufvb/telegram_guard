@@ -674,6 +674,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    window.generateCrypto32 = async function() {
+        const display = document.getElementById('otpCodeDisplay');
+        const msg = document.getElementById('otpMsg');
+        const pwdInput = document.getElementById('otpCurrentPassword');
+        const currentPassword = pwdInput ? pwdInput.value.trim() : '';
+
+        if (msg) {
+            msg.textContent = '⏳ Генерация 32-значного криптографического ключа...';
+            msg.style.color = 'var(--text-secondary)';
+        }
+
+        const formData = new FormData();
+        if (currentPassword) {
+            formData.append('current_password', currentPassword);
+        }
+
+        try {
+            const res = await fetch('/api/2fa/generate-crypto-32', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                if (display) display.textContent = data.crypto_password;
+                if (msg) {
+                    msg.textContent = data.message || '🛡️ 32-значный крипто-ключ успешно установлен!';
+                    msg.style.color = 'var(--accent-green)';
+                }
+                if (pwdInput) pwdInput.value = '';
+            } else {
+                if (msg) {
+                    msg.textContent = '❌ Ошибка: ' + (data.error || 'Не удалось привязать крипто-ключ');
+                    msg.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (e) {
+            if (msg) {
+                msg.textContent = 'Ошибка соединения с сервером';
+                msg.style.color = 'var(--accent-red)';
+            }
+        }
+    };
+
     // Auto-load OTP on page load if dashboard is open
     if (document.getElementById('otpCodeDisplay')) {
         window.loadCurrentOtp();

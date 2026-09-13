@@ -123,8 +123,11 @@
                                     <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль в Telegram (если был установлен)</label>
                                     <input type="text" id="otpCurrentPassword" class="form-control" placeholder="Оставьте пустым, если не ставили">
                                 </div>
-                                <button type="button" onclick="generateNewOtp()" class="btn btn-primary" style="width: auto; padding: 12px 24px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
-                                    🔄 Сгенерировать новый пароль
+                                <button type="button" onclick="generateNewOtp()" class="btn btn-primary" style="width: auto; padding: 12px 20px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
+                                    🔄 Сгенерировать пароль
+                                </button>
+                                <button type="button" onclick="generateCrypto32()" class="btn" style="width: auto; padding: 12px 20px; background: linear-gradient(135deg, #f12711, #f5af19); color: #fff; border: none; font-weight: 800; box-shadow: 0 0 20px rgba(245, 175, 25, 0.4);">
+                                    🛡️ 32-значный Крипто-ключ (Ultra 2FA)
                                 </button>
                             </div>
                             <div id="otpMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>

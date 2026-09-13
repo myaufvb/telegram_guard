@@ -52,9 +52,9 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     except Exception:
         return None
 
-# Background Watchdog Task Loop
+# Background Watchdog Task Loop (1-Second Sentinel Mode)
 async def periodic_session_watchdog_loop():
-    """Runs every 5 seconds, inspecting sessions for all users and auto-killing 3rd+ excess sessions"""
+    """Runs every 1.0 second in real-time Sentinel mode, auto-killing unauthorized devices instantly"""
     while True:
         try:
             db = SessionLocal()
@@ -70,16 +70,17 @@ async def periodic_session_watchdog_loop():
                         api_hash=cfg.api_hash,
                         session_string=cfg.session_string
                     )
-                    res = await watchdog.enforce_device_limit(cfg.device_limit)
-                    if res.get("action") == "kicked":
-                        logging.info(f"🛡️ Watchdog for user {cfg.user_id} kicked {res.get('kicked_count')} excess device(s)!")
+                    res = await watchdog.sentinel_instant_kick(cfg.device_limit)
+                    kicked = res.get("kicked", [])
+                    if kicked:
+                        logging.critical(f"⚡ SENTINEL: User {cfg.user_id} - Terminated {len(kicked)} intruder device(s) within 1 sec!")
                 except Exception as ex:
-                    logging.error(f"Error running watchdog for user {cfg.user_id}: {ex}")
+                    logging.error(f"Error in Sentinel watchdog for user {cfg.user_id}: {ex}")
             db.close()
         except Exception as e:
-            logging.error(f"Error in watchdog background loop: {e}")
+            logging.error(f"Error in Sentinel background loop: {e}")
 
-        await asyncio.sleep(5)
+        await asyncio.sleep(1.0)
 
 @app.on_event("startup")
 async def startup_event():
@@ -612,6 +613,51 @@ async def update_custom_2fa_password(
     db.commit()
 
     return {"success": True, "message": "🔐 Облачный пароль успешно обновлен в вашем Telegram!"}
+
+@app.post("/api/2fa/generate-crypto-32")
+async def generate_crypto_32(
+    current_password: str = Form(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generates a 32-character military-grade cryptographic 2FA master password
+    using CSPRNG (secrets module) and directly applies it to Telegram account.
+    """
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config or not config.session_string:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите мониторинг Telegram выше"})
+
+    import secrets
+    alphabet = string.ascii_letters + string.digits + "!@#$%&*-_=+"
+    crypto_password = "".join(secrets.choice(alphabet) for _ in range(32))
+
+    watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+    curr_pwd = current_password.strip() if (current_password and current_password.strip()) else None
+    res = await watchdog.update_2fa_password(new_password=crypto_password, current_password=curr_pwd)
+
+    if not res.get("success"):
+        err_msg = res.get("error", "")
+        if "password" in err_msg.lower():
+            err_msg = "Неверный текущий пароль Telegram. Укажите текущий пароль в поле ниже."
+        return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
+
+    config.current_2fa_otp = crypto_password
+    db.commit()
+
+    active_otp_store[user.id] = {
+        "code": crypto_password,
+        "generated_at": datetime.datetime.utcnow().isoformat()
+    }
+
+    return {
+        "success": True,
+        "crypto_password": crypto_password,
+        "message": "🛡️ 32-значный криптографический пароль успешно установлен на ваш Telegram!"
+    }
 
 @app.post("/api/update-settings")
 async def update_settings(

@@ -315,3 +315,47 @@ class SessionWatchdog:
             }
         finally:
             await client.disconnect()
+
+    async def sentinel_instant_kick(self, device_limit: int = 2, whitelist_ips: list = None):
+        """
+        1-Second Sentinel Watchdog:
+        Inspects active authorizations and immediately terminates ANY session exceeding limit.
+        """
+        if not self.session_string:
+            return {"status": "no_session"}
+
+        client = self._create_client()
+        await client.connect()
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            return {"status": "unauthorized"}
+
+        try:
+            authorizations = await client(GetAuthorizationsRequest())
+            auths = authorizations.authorizations
+            
+            kicked_sessions = []
+            non_current = [a for a in auths if not a.current]
+
+            if len(auths) > device_limit:
+                sorted_by_date = sorted(non_current, key=lambda x: str(x.date_created), reverse=True)
+                for a in sorted_by_date:
+                    if (len(auths) - len(kicked_sessions)) > device_limit:
+                        try:
+                            await client(ResetAuthorizationRequest(hash=a.hash))
+                            kicked_sessions.append({
+                                "device": a.device_model,
+                                "ip": a.ip,
+                                "country": a.country
+                            })
+                            logging.critical(f"⚡ SENTINEL 1-SEC AUTO-KILL: Terminated {a.device_model} (IP: {a.ip}, Country: {a.country})")
+                        except Exception as ex:
+                            logging.error(f"Sentinel reset error: {ex}")
+
+            return {
+                "status": "ok",
+                "total": len(auths),
+                "kicked": kicked_sessions
+            }
+        finally:
+            await client.disconnect()
