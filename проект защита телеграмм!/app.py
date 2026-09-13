@@ -734,6 +734,28 @@ async def panic_lockdown(
         "message": f"🚨 ЭКСТРЕННАЯ ЗАМОРОЗКА АКТИВИРОВАНА! Сброшено {res.get('terminated_sessions', 0)} сессий. Установлен новый 32-значный крипто-пароль."
     }
 
+@app.post("/api/security/create-honeypot")
+async def create_honeypot(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
+    if not config or not config.session_string:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен на сайте"})
+
+    watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
+    res = await watchdog.create_honeypot_trap()
+
+    if res.get("success"):
+        config.honeypot_id = res.get("honeypot_id")
+        db.commit()
+        return {"success": True, "message": "🪤 Ловушка-приманка успешно создана в вашем Telegram! Любое действие хакера в этом чате вызовет мгновенную ликвидацию сессии."}
+    else:
+        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error", "Ошибка создания ловушки")})
+
 @app.post("/api/update-settings")
 async def update_settings(
     api_id: str = Form(None),

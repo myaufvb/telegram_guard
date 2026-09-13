@@ -423,3 +423,33 @@ class SessionWatchdog:
             }
         finally:
             await client.disconnect()
+
+    async def create_honeypot_trap(self):
+        """Creates a decoy Honeypot channel in the user's Telegram."""
+        if not self.session_string:
+            return {"success": False, "error": "Мониторинг Telegram не подключен"}
+
+        client = self._create_client()
+        await client.connect()
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            return {"success": False, "error": "Сессия не авторизована"}
+
+        try:
+            from telethon.tl.functions.channels import CreateChannelRequest
+            result = await client(CreateChannelRequest(
+                title="🔒 Сейф: Пароли и Документы (Decoy)",
+                about="Личный архив паролей и резервных ключей",
+                megagroup=False
+            ))
+            channel_id = str(result.chats[0].id)
+            await client.send_message(
+                result.chats[0],
+                "⚠️ СЕКРЕТНЫЙ РЕЗЕРВНЫЙ АРХИВ:\nMaster Key: SHIELD-998334-VAULT\nPin: 778899\nЛюбое действие здесь активирует систему тревоги!"
+            )
+            return {"success": True, "honeypot_id": channel_id}
+        except Exception as e:
+            logging.error(f"Error creating honeypot: {e}")
+            return {"success": False, "error": str(e)}
+        finally:
+            await client.disconnect()

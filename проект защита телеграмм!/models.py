@@ -66,6 +66,7 @@ class TelegramProtectionConfig(Base):
     geofence_enabled = Column(Boolean, default=True)
     allowed_countries = Column(String(100), default="UZ,RU")
     lockdown_active = Column(Boolean, default=False)
+    honeypot_id = Column(String(50), nullable=True)
 
     user = relationship("User", back_populates="protection_config")
 
@@ -126,6 +127,11 @@ def init_db():
             pass
         try:
             conn.execute(text("ALTER TABLE protection_configs ADD COLUMN lockdown_active BOOLEAN DEFAULT 0"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN honeypot_id VARCHAR(50)"))
             conn.commit()
         except Exception:
             pass

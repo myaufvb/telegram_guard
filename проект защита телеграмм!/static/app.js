@@ -1061,4 +1061,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+
+    window.createHoneypotTrap = async function() {
+        const msgEl = document.getElementById('honeypotStatusMsg');
+        if (msgEl) {
+            msgEl.textContent = '⏳ Создание ловушки в вашем Telegram...';
+            msgEl.style.color = 'var(--text-secondary)';
+        }
+
+        try {
+            const res = await fetch('/api/security/create-honeypot', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                if (msgEl) {
+                    msgEl.textContent = '✅ ' + data.message;
+                    msgEl.style.color = 'var(--accent-green)';
+                }
+                alert(data.message);
+            } else {
+                if (msgEl) {
+                    msgEl.textContent = '❌ ' + (data.error || 'Ошибка');
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+            }
+        } catch (err) {
+            if (msgEl) {
+                msgEl.textContent = 'Ошибка соединения с сервером';
+                msgEl.style.color = 'var(--accent-red)';
+            }
+        }
+    };
 });

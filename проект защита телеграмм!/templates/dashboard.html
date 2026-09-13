@@ -152,6 +152,42 @@
 
                     <!-- Dynamic 2FA Cloud Password Card -->
                     <div style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(79, 172, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.12);">
+
+                    <!-- ANTI-SPAM SENTINEL & HONEYPOT CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(255, 159, 67, 0.08), rgba(254, 202, 87, 0.04)); border: 1px solid #ff9f43; padding: 1.4rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(255, 159, 67, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: #ff9f43; display: flex; align-items: center; gap: 8px;">
+                                <span>🛡️</span> Анти-Спам Сторож и Сессионный Honeypot
+                            </h3>
+                            <span class="badge badge-success">🟢 Активен (Лимит: 5 сообщ. за 3 сек)</span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1rem;">
+                            1. <strong>Анти-спам фильтр:</strong> Если хакер начинает массовую рассылку (5 сообщений за 3 сек или слова «деньги», «карта», «одолжи») — система <strong>мгновенно удаляет сообщения у всех получателей</strong> и выкидывает хакера.<br>
+                            2. <strong>Honeypot-ловушка:</strong> Создает секретный чат-приманку. Если взломщик зайдет в него — срабатывает тревога и моментальный сброс сессии.
+                        </p>
+                        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                            <button type="button" onclick="createHoneypotTrap()" class="btn" style="background: linear-gradient(135deg, #ff9f43, #ee5253); color: #fff; font-weight: 700; padding: 10px 20px; border: none; border-radius: 8px; box-shadow: 0 0 15px rgba(255, 159, 67, 0.4);">
+                                🪤 Создать Honeypot-ловушку в Telegram
+                            </button>
+                            <span id="honeypotStatusMsg" style="font-size: 0.88rem;"></span>
+                        </div>
+                    </div>
+
+                    <!-- TELEGRAM STEALTH MODE CARD -->
+                    <div style="background: linear-gradient(135deg, rgba(165, 94, 234, 0.08), rgba(75, 123, 236, 0.04)); border: 1px solid #a55eea; padding: 1.4rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(165, 94, 234, 0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.15rem; color: #a55eea; display: flex; align-items: center; gap: 8px;">
+                                <span>🕵️‍♂️</span> Режим Скрытности Telegram Desktop (Stealth Mode)
+                            </h3>
+                            <span class="badge badge-success">🛡️ Скрытое хранилище</span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1rem;">
+                            Переносит реальную сессию Telegram Desktop из стандартной папки <code>%APPDATA%</code> в замаскированную системную директорию <code>C:\ProgramData\WindowsTelemetryHost\Telegram</code>, а на старом месте оставляет отравленную ловушку для вирусов-стиллеров.
+                        </p>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Для запуска на ПК запустите файл: <code>activate_stealth_mode.bat</code></span>
+                        </div>
+                    </div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
                             <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
                                 <span>🔑</span> Динамический Облачный Пароль (2FA Telegram)
