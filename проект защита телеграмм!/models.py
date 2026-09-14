@@ -35,6 +35,7 @@ class User(Base):
     duress_password_hash = Column(String(255), nullable=True)
     emergency_trusted_phone = Column(String(30), nullable=True)
     sms_kill_code = Column(String(50), nullable=True)
+    telegram_chat_id = Column(String(50), nullable=True)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -99,6 +100,22 @@ class WhitelistedSession(Base):
     ip_address = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+class BotSubscriber(Base):
+    __tablename__ = "bot_subscribers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(String(50), unique=True, nullable=False, index=True)
+    phone_number = Column(String(30), nullable=True)
+    username = Column(String(50), nullable=True)
+    first_name = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class SystemMeta(Base):
+    __tablename__ = "system_metas"
+
+    key = Column(String(50), primary_key=True)
+    value = Column(Text, nullable=True)
+
 import os
 
 # Engine & Session setup
@@ -112,7 +129,14 @@ DATABASE_URL = raw_db_url
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=30,
+        max_overflow=50,
+        pool_timeout=15,
+        pool_recycle=300,
+        pool_pre_ping=True
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -181,6 +205,11 @@ def init_db():
             pass
         try:
             conn.execute(text("ALTER TABLE protection_configs ADD COLUMN honeytoken_key VARCHAR(100)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR(50)"))
             conn.commit()
         except Exception:
             pass

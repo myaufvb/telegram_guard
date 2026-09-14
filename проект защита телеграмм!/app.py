@@ -56,37 +56,53 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 async def periodic_session_watchdog_loop():
     while True:
         try:
+            targets = []
             db = SessionLocal()
-            configs = db.query(TelegramProtectionConfig).filter(
-                TelegramProtectionConfig.session_string.isnot(None),
-                TelegramProtectionConfig.auto_kill_enabled == True
-            ).all()
+            try:
+                configs = db.query(TelegramProtectionConfig).filter(
+                    TelegramProtectionConfig.session_string.isnot(None),
+                    TelegramProtectionConfig.auto_kill_enabled == True
+                ).all()
 
-            now = datetime.datetime.utcnow()
-            for cfg in configs:
-                try:
+                now = datetime.datetime.utcnow()
+                for cfg in configs:
                     block_web = cfg.block_web_logins
                     if cfg.web_login_allow_until and cfg.web_login_allow_until > now:
                         block_web = False
 
+                    targets.append({
+                        "user_id": cfg.user_id,
+                        "api_id": cfg.api_id,
+                        "api_hash": cfg.api_hash,
+                        "session_string": cfg.session_string,
+                        "device_limit": cfg.device_limit,
+                        "geofence_enabled": cfg.geofence_enabled,
+                        "allowed_countries": cfg.allowed_countries,
+                        "block_web_logins": block_web
+                    })
+            finally:
+                db.close()
+
+            # Now run MTProto network checks WITHOUT holding ANY database connection!
+            for t in targets:
+                try:
                     watchdog = SessionWatchdog(
-                        api_id=cfg.api_id,
-                        api_hash=cfg.api_hash,
-                        session_string=cfg.session_string
+                        api_id=t["api_id"],
+                        api_hash=t["api_hash"],
+                        session_string=t["session_string"]
                     )
                     res = await watchdog.sentinel_instant_kick(
-                        device_limit=cfg.device_limit,
-                        geofence_enabled=cfg.geofence_enabled,
-                        allowed_countries=cfg.allowed_countries,
-                        block_web_logins=block_web
+                        device_limit=t["device_limit"],
+                        geofence_enabled=t["geofence_enabled"],
+                        allowed_countries=t["allowed_countries"],
+                        block_web_logins=t["block_web_logins"]
                     )
                     kicked = res.get("kicked", [])
                     if kicked:
                         for k in kicked:
-                            logging.critical(f"⚡ SENTINEL: User {cfg.user_id} - Terminated intruder device {k.get('device')} ({k.get('ip')}, {k.get('country')}) [Reason: {k.get('reason')}]")
+                            logging.critical(f"⚡ SENTINEL: User {t['user_id']} - Terminated intruder device {k.get('device')} ({k.get('ip')}, {k.get('country')}) [Reason: {k.get('reason')}]")
                 except Exception as ex:
-                    logging.error(f"Error in Sentinel watchdog for user {cfg.user_id}: {ex}")
-            db.close()
+                    logging.error(f"Error in Sentinel watchdog for user {t['user_id']}: {ex}")
         except Exception as e:
             logging.error(f"Error in Sentinel background loop: {e}")
 

@@ -15,9 +15,11 @@ async def run_web():
     await server.serve()
 
 async def run_bot():
-    """Starts Telegram Bot polling"""
+    """Starts Telegram Bot polling and triggers update broadcast"""
     logging.info("Starting Telegram Bot @teelegram_guard_bot...")
     try:
+        from bot import broadcast_system_update
+        asyncio.create_task(broadcast_system_update())
         await dp.start_polling(bot)
     except Exception as e:
         logging.error(f"Bot error: {e}")
