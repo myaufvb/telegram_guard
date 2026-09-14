@@ -586,9 +586,12 @@
                             </h3>
                             <span class="badge badge-success">🔐 FIDO2 / Passkey</span>
                         </div>
-                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.2rem; line-height: 1.5;">
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 0.8rem; line-height: 1.5;">
                             Привяжите отпечаток пальца, сканер лица или аппаратный ключ YubiKey. Вы сможете входить в личный кабинет в 1 касание без ввода пароля, а вирусы-кейлоггеры никогда не смогут перехватить доступ!
                         </p>
+                        <div style="background: rgba(30, 144, 255, 0.1); border-left: 3px solid #1e90ff; padding: 10px 14px; border-radius: 6px; font-size: 0.84rem; color: #a4b0be; margin-bottom: 1.2rem; line-height: 1.4;">
+                            💡 <strong>Как привязать на обычном ПК:</strong> Нажмите кнопку ниже. В открывшемся системном окне выберите <em>«Использовать телефон или планшет»</em> — на экране появится QR-код. Отсканируйте его камерой смартфона (iPhone Face ID или Android отпечаток), и доступ будет мгновенно привязан! Либо используйте ПИН-код Windows Hello / USB-ключ. На смартфоне Face ID срабатывает автоматически.
+                        </div>
                         <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                             <button type="button" onclick="registerWebAuthnBiometrics()" class="btn" style="background: linear-gradient(135deg, #2ed573, #1e90ff); color: #fff; font-weight: 700; padding: 12px 22px; border: none; border-radius: 8px; box-shadow: 0 0 15px rgba(46, 213, 115, 0.4); cursor: pointer;">
                                 🔑 Зарегистрировать Face ID / Touch ID / Ключ

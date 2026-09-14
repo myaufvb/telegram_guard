@@ -1332,19 +1332,26 @@ async def scan_profile_clones_api(user: User = Depends(get_current_user), db: Se
 
 # 5. WEBAUTHN / PASSKEY / BIOMETRIC AUTH
 @app.post("/api/webauthn/register-options")
-async def webauthn_register_options(user: User = Depends(get_current_user)):
+async def webauthn_register_options(request: Request, user: User = Depends(get_current_user)):
     import secrets
     challenge = secrets.token_urlsafe(32)
+    host = request.headers.get("host", "").split(":")[0]
+    rp_dict = {"name": "Telegram Guard"}
+    if host and host != "localhost" and not host.replace(".", "").isdigit():
+        rp_dict["id"] = host
     return {
         "success": True,
         "challenge": challenge,
-        "rp": {"name": "Telegram Guard"},
+        "rp": rp_dict,
         "user": {
             "id": str(user.id),
             "name": user.username,
             "displayName": user.username
         },
-        "pubKeyCredParams": [{"alg": -7, "type": "public-key"}, {"alg": -257, "type": "public-key"}]
+        "pubKeyCredParams": [
+            {"alg": -7, "type": "public-key"},
+            {"alg": -257, "type": "public-key"}
+        ]
     }
 
 @app.post("/api/webauthn/register-verify")
@@ -1366,9 +1373,15 @@ async def webauthn_register_verify(
     return {"success": True, "message": f"Ключ / биометрия '{device_name}' успешно привязана к аккаунту!"}
 
 @app.post("/api/webauthn/login-options")
-async def webauthn_login_options():
+async def webauthn_login_options(request: Request):
     import secrets
-    return {"success": True, "challenge": secrets.token_urlsafe(32)}
+    host = request.headers.get("host", "").split(":")[0]
+    rp_id = host if (host and host != "localhost" and not host.replace(".", "").isdigit()) else None
+    return {
+        "success": True,
+        "challenge": secrets.token_urlsafe(32),
+        "rpId": rp_id
+    }
 
 @app.post("/api/webauthn/login-verify")
 async def webauthn_login_verify(credential_id: str = Form(...), db: Session = Depends(get_db)):

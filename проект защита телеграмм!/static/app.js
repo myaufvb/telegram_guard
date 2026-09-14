@@ -1347,7 +1347,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.registerWebAuthnBiometrics = async function() {
         const msgEl = document.getElementById('webauthnRegStatusMsg');
         if (msgEl) {
-            msgEl.textContent = '⏳ Инициализация сканера биометрии (Touch ID / Face ID / Windows Hello)...';
+            msgEl.textContent = '⏳ Инициализация сканера биометрии (Face ID / Touch ID / Телефон / Ключ)...';
             msgEl.style.color = 'var(--text-secondary)';
         }
 
@@ -1367,14 +1367,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             challenge: challenge,
                             rp: optData.rp,
                             user: {
-                                id: Uint8Array.from(optData.user.id, c => c.charCodeAt(0)),
+                                id: new TextEncoder().encode(String(optData.user.id)),
                                 name: optData.user.name,
                                 displayName: optData.user.displayName
                             },
                             pubKeyCredParams: optData.pubKeyCredParams,
                             authenticatorSelection: {
-                                authenticatorAttachment: 'platform',
-                                userVerification: 'preferred'
+                                userVerification: 'preferred',
+                                residentKey: 'preferred'
                             },
                             timeout: 60000
                         }
@@ -1383,13 +1383,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         credentialId = cred.id;
                     }
                 } catch (webauthnErr) {
-                    console.log('Native WebAuthn prompt fallback:', webauthnErr);
+                    console.log('Native WebAuthn prompt notice:', webauthnErr);
+                    if (webauthnErr.name === 'NotAllowedError') {
+                        throw new Error('Регистрация отменена пользователем или истекло время.');
+                    }
                 }
             }
 
             const verifyFd = new FormData();
             verifyFd.append('credential_id', credentialId);
-            verifyFd.append('device_name', 'Face ID / Touch ID / YubiKey');
+            verifyFd.append('device_name', 'Face ID / Touch ID / Passkey');
 
             const verRes = await fetch('/api/webauthn/register-verify', { method: 'POST', body: verifyFd });
             const verData = await verRes.json();
@@ -1435,12 +1438,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const optRes = await fetch('/api/webauthn/login-options', { method: 'POST' });
                     const optData = await optRes.json();
                     const challenge = Uint8Array.from(atob(optData.challenge.replace(/-/g, '+').replace(/_/g, '/').padEnd(optData.challenge.length + (4 - optData.challenge.length % 4) % 4, '=')), c => c.charCodeAt(0));
+                    const getOptions = {
+                        challenge: challenge,
+                        timeout: 60000,
+                        userVerification: 'preferred'
+                    };
+                    if (optData.rpId) {
+                        getOptions.rpId = optData.rpId;
+                    }
                     await navigator.credentials.get({
-                        publicKey: {
-                            challenge: challenge,
-                            timeout: 60000,
-                            userVerification: 'preferred'
-                        }
+                        publicKey: getOptions
                     });
                 } catch (navErr) {
                     console.log('Biometric prompt:', navErr);
