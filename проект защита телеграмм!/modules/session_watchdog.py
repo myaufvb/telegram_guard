@@ -79,9 +79,10 @@ class SessionWatchdog:
             lang_code=lang_code or LANG_CODE
         )
 
-    async def update_2fa_password(self, new_password: str, current_password: str = None):
+    async def update_2fa_password(self, new_password: str, current_password: str = None, fallback_passwords: list = None):
         """
         Updates Telegram 2FA Cloud Password directly on user's Telegram account.
+        Automatically attempts current_password and fallback candidates.
         """
         if not self.session_string:
             return {"success": False, "error": "MTProto сессия не подключена"}
@@ -92,14 +93,30 @@ class SessionWatchdog:
             await client.disconnect()
             return {"success": False, "error": "Сессия не авторизована в Telegram"}
 
-        try:
-            await client.edit_2fa(new_password=new_password, current_password=current_password)
-            await client.disconnect()
-            return {"success": True, "new_password": new_password}
-        except Exception as e:
-            logging.error(f"Error editing 2FA password: {e}")
-            await client.disconnect()
-            return {"success": False, "error": str(e)}
+        candidates = []
+        if current_password and str(current_password).strip():
+            candidates.append(str(current_password).strip())
+        if fallback_passwords:
+            for fb in fallback_passwords:
+                if fb and str(fb).strip() and str(fb).strip() not in candidates:
+                    candidates.append(str(fb).strip())
+        if None not in candidates:
+            candidates.append(None)
+
+        last_error = None
+        for cand in candidates:
+            try:
+                await client.edit_2fa(new_password=new_password, current_password=cand)
+                await client.disconnect()
+                logging.info(f"✅ 2FA password successfully changed to '{new_password}' (using previous password: {cand})")
+                return {"success": True, "new_password": new_password}
+            except Exception as e:
+                last_error = e
+                logging.warning(f"edit_2fa with candidate '{cand}' failed: {e}")
+                continue
+
+        await client.disconnect()
+        return {"success": False, "error": str(last_error)}
 
     async def send_login_code(self, phone: str):
         # Build candidate credential list

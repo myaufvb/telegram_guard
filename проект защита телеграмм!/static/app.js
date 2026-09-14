@@ -771,13 +771,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
 
                 if (data.success) {
+                    const display = document.getElementById('otpCodeDisplay');
+                    if (display && data.new_password) display.textContent = data.new_password;
                     if (msg) {
                         msg.textContent = data.message || '✅ Облачный пароль успешно обновлен!';
                         msg.style.color = 'var(--accent-green)';
                     }
                 } else {
                     if (msg) {
-                        msg.textContent = '❌ Ошибка: ' + (data.error || 'Не удалось обновить пароль');
+                        msg.textContent = '❌ ' + (data.error || 'Не удалось обновить пароль');
                         msg.style.color = 'var(--accent-red)';
                     }
                 }
@@ -789,6 +791,40 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Set 2010090900 2FA in 1 click
+    window.setCloudPassword2010 = async function() {
+        const display = document.getElementById('otpCodeDisplay');
+        const msg = document.getElementById('otpMsg') || document.getElementById('custom2faMsg');
+        if (msg) {
+            msg.textContent = '⏳ Установка облачного пароля 2010090900 в Telegram...';
+            msg.style.color = 'var(--accent-cyan)';
+        }
+
+        try {
+            const res = await fetch('/api/2fa/set-default-2010', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                if (display) display.textContent = data.new_password || '2010090900';
+                if (msg) {
+                    msg.textContent = data.message || '✅ Облачный пароль 2010090900 успешно установлен!';
+                    msg.style.color = 'var(--accent-green)';
+                }
+                alert('🔐 Пароль 2010090900 успешно установлен в вашем Telegram!');
+            } else {
+                if (msg) {
+                    msg.textContent = '❌ ' + (data.error || 'Ошибка установки пароля');
+                    msg.style.color = 'var(--accent-red)';
+                }
+                alert('Ошибка: ' + (data.error || 'Не удалось установить пароль'));
+            }
+        } catch (e) {
+            if (msg) {
+                msg.textContent = 'Ошибка соединения с сервером';
+                msg.style.color = 'var(--accent-red)';
+            }
+        }
+    };
 
     // 2-Step Email Verification Handlers
     const requestEmailCodeForm = document.getElementById('requestEmailCodeForm');

@@ -386,6 +386,9 @@
                                     <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль в Telegram (если был установлен)</label>
                                     <input type="text" id="otpCurrentPassword" class="form-control" placeholder="Оставьте пустым, если не ставили">
                                 </div>
+                                <button type="button" onclick="setCloudPassword2010()" class="btn" style="width: auto; padding: 12px 20px; background: linear-gradient(135deg, #10ac84, #1dd1a1); color: #fff; border: none; font-weight: 800; box-shadow: 0 0 20px rgba(29, 209, 161, 0.4); cursor: pointer;">
+                                    🔑 Поставить 2010090900 (1 клик)
+                                </button>
                                 <button type="button" onclick="generateNewOtp()" class="btn btn-primary" style="width: auto; padding: 12px 20px; background: linear-gradient(135deg, #00f2fe, #4facfe); border: none; font-weight: 700; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
                                     🔄 Сгенерировать пароль
                                 </button>
@@ -397,21 +400,21 @@
                         </div>
 
                         <!-- Manual Custom 2FA Form Toggle -->
-                        <details style="margin-top: 1rem;">
+                        <details style="margin-top: 1rem;" open>
                             <summary style="font-size: 0.88rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
                                 ⚙️ Или установить свой постоянный пароль вручную
                             </summary>
                             <form id="custom2faForm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
                                 <div style="flex: 1; min-width: 180px;">
                                     <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Ваш произвольный пароль</label>
-                                    <input type="text" id="newCustom2faInput" name="new_password" class="form-control" placeholder="Любой ваш пароль" required>
+                                    <input type="text" id="newCustom2faInput" name="new_password" class="form-control" value="2010090900" placeholder="Любой ваш пароль" required>
                                 </div>
                                 <div style="flex: 1; min-width: 180px;">
-                                    <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль (если был)</label>
-                                    <input type="text" id="currentCustom2faInput" name="current_password" class="form-control" placeholder="Текущий пароль">
+                                    <label style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Текущий пароль (необязательно)</label>
+                                    <input type="text" id="currentCustom2faInput" name="current_password" class="form-control" placeholder="Оставьте пустым — система определит сама">
                                 </div>
                                 <button type="submit" class="btn btn-secondary" style="width: auto; padding: 11px 20px; font-size: 0.88rem;">
-                                    💾 Сохранить
+                                    💾 Сохранить пароль
                                 </button>
                             </form>
                             <div id="custom2faMsg" style="margin-top: 8px; font-size: 0.88rem;"></div>
