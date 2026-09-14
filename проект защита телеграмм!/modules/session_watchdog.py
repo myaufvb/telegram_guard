@@ -358,6 +358,7 @@ class SessionWatchdog:
             non_current = [a for a in auths if not a.current]
 
             # 0. Zero-Trust Web & QR-Login Blocker
+            fresh_forbidden = False
             if block_web_logins:
                 web_keywords = ["web", "webz", "webk", "chrome", "firefox", "safari", "opera", "edge", "browser"]
                 for a in non_current:
@@ -374,11 +375,18 @@ class SessionWatchdog:
                                 "reason": "web_qr_blocked"
                             })
                             logging.critical(f"🚫 ZERO-TRUST WEB/QR BLOCKED: Terminated session '{a.device_model}' / '{a.app_name}' (IP: {a.ip})")
+                        except FreshResetAuthorisationForbiddenError:
+                            fresh_forbidden = True
+                            logging.warning("⏳ Web/QR Blocker: Сессия создана недавно (<24ч). Telegram временно запрещает завершать другие сессии. Пауза проверки.")
+                            break
                         except Exception as ex:
+                            if "fresh" in str(ex).lower():
+                                fresh_forbidden = True
+                                break
                             logging.error(f"Web/QR reset error: {ex}")
 
             # 1. Geo-fence validation
-            if geofence_enabled and allowed_countries:
+            if not fresh_forbidden and geofence_enabled and allowed_countries:
                 allowed = [c.strip().upper() for c in allowed_countries.split(",") if c.strip()]
                 for a in non_current:
                     if any(k.get("ip") == a.ip for k in kicked_sessions):
@@ -394,33 +402,48 @@ class SessionWatchdog:
                                 "reason": "geofence_blocked"
                             })
                             logging.critical(f"🌍 GEOFENCE BLOCKED: Terminated session from unauthorized country '{a.country}' (Device: {a.device_model}, IP: {a.ip})")
+                        except FreshResetAuthorisationForbiddenError:
+                            fresh_forbidden = True
+                            logging.warning("⏳ Geo-Fence: Сессия создана недавно (<24ч), Telegram временно запрещает сброс сессий.")
+                            break
                         except Exception as ex:
+                            if "fresh" in str(ex).lower():
+                                fresh_forbidden = True
+                                break
                             logging.error(f"Geofence reset error: {ex}")
 
             # 2. Device limit enforcement
-            remaining = [a for a in non_current if not any(k.get("ip") == a.ip for k in kicked_sessions)]
-            current_total = len(auths) - len(kicked_sessions)
-            if current_total > device_limit:
-                sorted_by_date = sorted(remaining, key=lambda x: str(x.date_created), reverse=True)
-                for a in sorted_by_date:
-                    if current_total > device_limit:
-                        try:
-                            await client(ResetAuthorizationRequest(hash=a.hash))
-                            kicked_sessions.append({
-                                "device": a.device_model,
-                                "ip": a.ip,
-                                "country": a.country,
-                                "reason": "limit_exceeded"
-                            })
-                            current_total -= 1
-                            logging.critical(f"⚡ SENTINEL 1-SEC AUTO-KILL: Terminated {a.device_model} (IP: {a.ip}, Country: {a.country})")
-                        except Exception as ex:
-                            logging.error(f"Sentinel reset error: {ex}")
+            if not fresh_forbidden:
+                remaining = [a for a in non_current if not any(k.get("ip") == a.ip for k in kicked_sessions)]
+                current_total = len(auths) - len(kicked_sessions)
+                if current_total > device_limit:
+                    sorted_by_date = sorted(remaining, key=lambda x: str(x.date_created), reverse=True)
+                    for a in sorted_by_date:
+                        if current_total > device_limit:
+                            try:
+                                await client(ResetAuthorizationRequest(hash=a.hash))
+                                kicked_sessions.append({
+                                    "device": a.device_model,
+                                    "ip": a.ip,
+                                    "country": a.country,
+                                    "reason": "limit_exceeded"
+                                })
+                                current_total -= 1
+                                logging.critical(f"⚡ SENTINEL AUTO-KILL: Terminated {a.device_model} (IP: {a.ip})")
+                            except FreshResetAuthorisationForbiddenError:
+                                fresh_forbidden = True
+                                break
+                            except Exception as ex:
+                                if "fresh" in str(ex).lower():
+                                    fresh_forbidden = True
+                                    break
+                                logging.error(f"Sentinel reset error: {ex}")
 
             return {
                 "status": "ok",
                 "total": len(auths),
-                "kicked": kicked_sessions
+                "kicked": kicked_sessions,
+                "fresh_forbidden": fresh_forbidden
             }
         finally:
             await client.disconnect()

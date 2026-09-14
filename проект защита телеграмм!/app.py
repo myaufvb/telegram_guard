@@ -52,10 +52,13 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     except Exception:
         return None
 
-# 1-Second Sentinel Background Watchdog
+# Sentinel Background Watchdog
+_fresh_session_cooldowns = {}  # user_id -> datetime
+
 async def periodic_session_watchdog_loop():
     while True:
         try:
+            now = datetime.datetime.utcnow()
             targets = []
             db = SessionLocal()
             try:
@@ -64,8 +67,14 @@ async def periodic_session_watchdog_loop():
                     TelegramProtectionConfig.auto_kill_enabled == True
                 ).all()
 
-                now = datetime.datetime.utcnow()
                 for cfg in configs:
+                    # If this user's session was created <24h ago, Telegram blocks ResetAuthorizationRequest
+                    if cfg.user_id in _fresh_session_cooldowns:
+                        if now < _fresh_session_cooldowns[cfg.user_id]:
+                            continue
+                        else:
+                            _fresh_session_cooldowns.pop(cfg.user_id, None)
+
                     block_web = cfg.block_web_logins
                     if cfg.web_login_allow_until and cfg.web_login_allow_until > now:
                         block_web = False
@@ -97,16 +106,24 @@ async def periodic_session_watchdog_loop():
                         allowed_countries=t["allowed_countries"],
                         block_web_logins=t["block_web_logins"]
                     )
+                    if res.get("fresh_forbidden"):
+                        # Telegram requires new session to warm up for 24h. Pause attempts for 30 minutes.
+                        _fresh_session_cooldowns[t["user_id"]] = now + datetime.timedelta(minutes=30)
+                        logging.info(f"⏳ User {t['user_id']}: сессия новая (<24ч). Telegram временно блокирует сброс чужих устройств. Пауза 30 минут.")
+
                     kicked = res.get("kicked", [])
                     if kicked:
                         for k in kicked:
                             logging.critical(f"⚡ SENTINEL: User {t['user_id']} - Terminated intruder device {k.get('device')} ({k.get('ip')}, {k.get('country')}) [Reason: {k.get('reason')}]")
                 except Exception as ex:
-                    logging.error(f"Error in Sentinel watchdog for user {t['user_id']}: {ex}")
+                    if "fresh" in str(ex).lower():
+                        _fresh_session_cooldowns[t["user_id"]] = now + datetime.timedelta(minutes=30)
+                    else:
+                        logging.error(f"Error in Sentinel watchdog for user {t['user_id']}: {ex}")
         except Exception as e:
             logging.error(f"Error in Sentinel background loop: {e}")
 
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(5.0)
 
 @app.on_event("startup")
 async def startup_event():
