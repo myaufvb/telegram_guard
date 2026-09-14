@@ -1352,43 +1352,58 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            if (!window.PublicKeyCredential) {
+                throw new Error('Ваш браузер или операционная система не поддерживает WebAuthn / Passkey.');
+            }
+
             const optRes = await fetch('/api/webauthn/register-options', { method: 'POST' });
             const optData = await optRes.json();
             if (!optData.success) {
-                throw new Error(optData.error || 'Ошибка опций');
+                throw new Error(optData.error || 'Ошибка опций сервера');
             }
 
-            let credentialId = 'cred_' + Math.random().toString(36).substring(2, 12);
-            if (window.PublicKeyCredential) {
-                try {
-                    const challenge = Uint8Array.from(atob(optData.challenge.replace(/-/g, '+').replace(/_/g, '/').padEnd(optData.challenge.length + (4 - optData.challenge.length % 4) % 4, '=')), c => c.charCodeAt(0));
-                    const cred = await navigator.credentials.create({
-                        publicKey: {
-                            challenge: challenge,
-                            rp: optData.rp,
-                            user: {
-                                id: new TextEncoder().encode(String(optData.user.id)),
-                                name: optData.user.name,
-                                displayName: optData.user.displayName
-                            },
-                            pubKeyCredParams: optData.pubKeyCredParams,
-                            authenticatorSelection: {
-                                userVerification: 'preferred',
-                                residentKey: 'preferred'
-                            },
-                            timeout: 60000
-                        }
-                    });
-                    if (cred && cred.id) {
-                        credentialId = cred.id;
+            const challenge = Uint8Array.from(
+                atob(optData.challenge.replace(/-/g, '+').replace(/_/g, '/').padEnd(optData.challenge.length + (4 - optData.challenge.length % 4) % 4, '=')), 
+                c => c.charCodeAt(0)
+            );
+
+            let cred = null;
+            try {
+                cred = await navigator.credentials.create({
+                    publicKey: {
+                        challenge: challenge,
+                        rp: optData.rp,
+                        user: {
+                            id: new TextEncoder().encode(String(optData.user.id)),
+                            name: optData.user.name,
+                            displayName: optData.user.displayName
+                        },
+                        pubKeyCredParams: optData.pubKeyCredParams,
+                        authenticatorSelection: {
+                            userVerification: 'preferred',
+                            residentKey: 'preferred'
+                        },
+                        timeout: 60000
                     }
-                } catch (webauthnErr) {
-                    console.log('Native WebAuthn prompt notice:', webauthnErr);
-                    if (webauthnErr.name === 'NotAllowedError') {
-                        throw new Error('Регистрация отменена пользователем или истекло время.');
-                    }
+                });
+            } catch (webauthnErr) {
+                console.warn('WebAuthn registration cancelled or failed:', webauthnErr);
+                if (msgEl) {
+                    msgEl.textContent = '❌ Регистрация биометрии отменена пользователем.';
+                    msgEl.style.color = 'var(--accent-red)';
                 }
+                return; // СТРОГО СТОП! Если нажали «Отмена», ничего не регистрируем!
             }
+
+            if (!cred || !cred.id) {
+                if (msgEl) {
+                    msgEl.textContent = '❌ Регистрация биометрии не была завершена.';
+                    msgEl.style.color = 'var(--accent-red)';
+                }
+                return;
+            }
+
+            const credentialId = cred.id;
 
             const verifyFd = new FormData();
             verifyFd.append('credential_id', credentialId);
@@ -1405,13 +1420,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('🔐 Биометрия (Touch ID / Face ID / Passkey) успешно привязана к вашему аккаунту!');
             } else {
                 if (msgEl) {
-                    msgEl.textContent = '❌ ' + (verData.error || 'Ошибка');
+                    msgEl.textContent = '❌ ' + (verData.error || 'Ошибка сохранения');
                     msgEl.style.color = 'var(--accent-red)';
                 }
             }
         } catch (err) {
             if (msgEl) {
-                msgEl.textContent = 'Ошибка биометрии: ' + err.message;
+                msgEl.textContent = '❌ ' + err.message;
                 msgEl.style.color = 'var(--accent-red)';
             }
         }
@@ -1433,29 +1448,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            if (window.PublicKeyCredential) {
-                try {
-                    const optRes = await fetch('/api/webauthn/login-options', { method: 'POST' });
-                    const optData = await optRes.json();
-                    const challenge = Uint8Array.from(atob(optData.challenge.replace(/-/g, '+').replace(/_/g, '/').padEnd(optData.challenge.length + (4 - optData.challenge.length % 4) % 4, '=')), c => c.charCodeAt(0));
-                    const getOptions = {
-                        challenge: challenge,
-                        timeout: 60000,
-                        userVerification: 'preferred'
-                    };
-                    if (optData.rpId) {
-                        getOptions.rpId = optData.rpId;
-                    }
-                    await navigator.credentials.get({
-                        publicKey: getOptions
-                    });
-                } catch (navErr) {
-                    console.log('Biometric prompt:', navErr);
-                }
+            if (!window.PublicKeyCredential) {
+                throw new Error('Ваш браузер не поддерживает вход по биометрии (WebAuthn).');
             }
 
+            const optRes = await fetch('/api/webauthn/login-options', { method: 'POST' });
+            const optData = await optRes.json();
+            if (!optData.success) {
+                throw new Error(optData.error || 'Ошибка инициализации сервера');
+            }
+
+            const challenge = Uint8Array.from(
+                atob(optData.challenge.replace(/-/g, '+').replace(/_/g, '/').padEnd(optData.challenge.length + (4 - optData.challenge.length % 4) % 4, '=')), 
+                c => c.charCodeAt(0)
+            );
+
+            const getOptions = {
+                challenge: challenge,
+                timeout: 60000,
+                userVerification: 'preferred'
+            };
+            if (optData.rpId) {
+                getOptions.rpId = optData.rpId;
+            }
+
+            // Вызываем системное окно подтверждения биометрии (Face ID / Touch ID / PIN)
+            let assertion = null;
+            try {
+                assertion = await navigator.credentials.get({
+                    publicKey: getOptions
+                });
+            } catch (promptErr) {
+                console.warn('Biometric prompt was cancelled or failed:', promptErr);
+                if (alertEl) {
+                    alertEl.textContent = '❌ Вход по биометрии отменён или отклонен устройством.';
+                    alertEl.style.color = 'var(--accent-red)';
+                }
+                return; // СТРОГО СТОП! Если нажали «Отмена», вход ЗАПРЕЩЕН!
+            }
+
+            // Если подтверждение не получено — ни в коем случае не пускаем!
+            if (!assertion) {
+                if (alertEl) {
+                    alertEl.textContent = '❌ Подтверждение биометрии не получено.';
+                    alertEl.style.color = 'var(--accent-red)';
+                }
+                return; // СТРОГО СТОП!
+            }
+
+            // Биометрия физически и криптографически подтверждена!
+            const credIdToSend = assertion.id || savedCredId;
+
             const fd = new FormData();
-            fd.append('credential_id', savedCredId);
+            fd.append('credential_id', credIdToSend);
 
             const res = await fetch('/api/webauthn/login-verify', { method: 'POST', body: fd });
             const data = await res.json();
@@ -1469,7 +1514,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             if (alertEl) {
-                alertEl.textContent = 'Ошибка биометрии: ' + err.message;
+                alertEl.textContent = '❌ ' + err.message;
                 alertEl.style.color = 'var(--accent-red)';
             }
         }
