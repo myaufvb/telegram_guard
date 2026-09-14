@@ -142,74 +142,34 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
-    with engine.connect() as conn:
+    
+    is_sqlite = DATABASE_URL.startswith("sqlite")
+    
+    migrations = [
+        ("protection_configs", "current_2fa_otp", "VARCHAR(50)", None),
+        ("users", "email", "VARCHAR(100)", None),
+        ("users", "role", "VARCHAR(20)", "'client'"),
+        ("protection_configs", "geofence_enabled", "BOOLEAN", "TRUE" if not is_sqlite else "1"),
+        ("protection_configs", "allowed_countries", "VARCHAR(100)", "'UZ,RU'"),
+        ("protection_configs", "lockdown_active", "BOOLEAN", "FALSE" if not is_sqlite else "0"),
+        ("protection_configs", "honeypot_id", "VARCHAR(50)", None),
+        ("users", "duress_password_hash", "VARCHAR(255)", None),
+        ("users", "emergency_trusted_phone", "VARCHAR(30)", None),
+        ("users", "sms_kill_code", "VARCHAR(50)", None),
+        ("protection_configs", "block_web_logins", "BOOLEAN", "TRUE" if not is_sqlite else "1"),
+        ("protection_configs", "web_login_allow_until", "TIMESTAMP", None),
+        ("protection_configs", "honeytoken_key", "VARCHAR(100)", None),
+        ("users", "telegram_chat_id", "VARCHAR(50)", None),
+    ]
+
+    for table, col, col_type, default_val in migrations:
         try:
-            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN current_2fa_otp VARCHAR(50)"))
-            conn.commit()
+            with engine.begin() as conn:
+                def_clause = f" DEFAULT {default_val}" if default_val is not None else ""
+                if is_sqlite:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}{def_clause}"))
+                else:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}{def_clause}"))
         except Exception:
             pass
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(100)"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'client'"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN geofence_enabled BOOLEAN DEFAULT 1"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN allowed_countries VARCHAR(100) DEFAULT 'UZ,RU'"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN lockdown_active BOOLEAN DEFAULT 0"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN honeypot_id VARCHAR(50)"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN duress_password_hash VARCHAR(255)"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN emergency_trusted_phone VARCHAR(30)"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN sms_kill_code VARCHAR(50)"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN block_web_logins BOOLEAN DEFAULT 1"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN web_login_allow_until TIMESTAMP"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE protection_configs ADD COLUMN honeytoken_key VARCHAR(100)"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR(50)"))
-            conn.commit()
-        except Exception:
-            pass
+

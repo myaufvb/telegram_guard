@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (titleEl) titleEl.textContent = 'Подтверждение входа в систему';
                     const descEl = document.getElementById('verifyModalDesc');
                     if (descEl) {
-                        descEl.innerHTML = 'Для подтверждения входа откройте бот <strong>@Defense_telegram_lerman_bot</strong>, нажмите <strong>«📱 Поделиться контактом»</strong> и введите полученный 6-значный код:';
+                        descEl.innerHTML = 'Для подтверждения входа откройте бот <strong>@teelegram_guard_bot</strong>, нажмите <strong>«📱 Поделиться контактом»</strong> и введите полученный 6-значный код:';
                     }
                     const modal = document.getElementById('verifyModal');
                     if (modal) {
@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (titleEl) titleEl.textContent = 'Подтверждение регистрации';
                     const descEl = document.getElementById('verifyModalDesc');
                     if (descEl) {
-                        descEl.innerHTML = 'Для завершения регистрации откройте бот <strong>@Defense_telegram_lerman_bot</strong>, нажмите <strong>«📱 Поделиться контактом»</strong> и введите полученный 6-значный код:';
+                        descEl.innerHTML = 'Для завершения регистрации откройте бот <strong>@teelegram_guard_bot</strong>, нажмите <strong>«📱 Поделиться контактом»</strong> и введите полученный 6-значный код:';
                     }
                     const modal = document.getElementById('verifyModal');
                     if (modal) {
