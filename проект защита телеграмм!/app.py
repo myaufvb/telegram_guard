@@ -539,7 +539,11 @@ async def mtproto_send_code(
         "session_string": res["session_string"]
     }
 
-    return {"success": True, "message": f"Код входа отправлен в ваше приложение Telegram на номер {user.phone_number}"}
+    return {
+        "success": True,
+        "message": f"Код входа отправлен в ваше приложение Telegram на номер {user.phone_number}",
+        "phone": user.phone_number
+    }
 
 @app.post("/api/mtproto/verify-code")
 async def mtproto_verify_code(

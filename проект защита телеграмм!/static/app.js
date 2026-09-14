@@ -476,8 +476,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (result.success) {
                 if (statusMsg) {
-                    statusMsg.textContent = '✅ Код успешно отправлен в ваше приложение Telegram!';
+                    statusMsg.textContent = '✅ ' + (result.message || 'Код успешно отправлен в Telegram!');
                     statusMsg.style.color = 'var(--accent-green)';
+                }
+                if (result.phone) {
+                    const p1 = document.getElementById('mtprotoModalPhone');
+                    const p2 = document.getElementById('mtprotoHintPhone');
+                    if (p1) p1.textContent = result.phone;
+                    if (p2) p2.textContent = result.phone;
                 }
                 const modal = document.getElementById('mtprotoModal');
                 if (modal) modal.classList.add('active');
