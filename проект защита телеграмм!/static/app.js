@@ -448,13 +448,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Helper: Handle unauthorized Telegram sessions gracefully
+    window.handleSessionUnauthorized = function(msgEl, customMsg) {
+        if (msgEl) {
+            msgEl.innerHTML = '❌ ' + (customMsg || 'Сессия Telegram не подключена или устарела.') +
+                ' <button type="button" onclick="window.onSendMtprotoCodeClick(event)" class="btn btn-sm" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; font-size: 0.82rem; background: var(--accent-cyan); color: #000; font-weight: 700; border-radius: 6px; margin-left: 8px; cursor: pointer; border: none; text-decoration: none;">🚀 Подключить сессию</button>';
+            msgEl.style.color = 'var(--accent-red)';
+        }
+        const card = document.getElementById('mtprotoMainCard');
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    };
+
     // MTProto: Send Code Handler
     window.onSendMtprotoCodeClick = async function(e) {
         if (e) e.preventDefault();
         const statusMsg = document.getElementById('mtprotoStatusMsg');
         if (statusMsg) {
-            statusMsg.textContent = 'Отправка запроса в Telegram...';
-            statusMsg.style.color = 'var(--text-secondary)';
+            statusMsg.textContent = '⏳ Отправка запроса в Telegram...';
+            statusMsg.style.color = 'var(--accent-cyan)';
         }
 
         try {
@@ -468,6 +481,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const modal = document.getElementById('mtprotoModal');
                 if (modal) modal.classList.add('active');
+                const inp = document.getElementById('mtprotoCodeInput');
+                if (inp) {
+                    inp.value = '';
+                    inp.focus();
+                }
             } else {
                 if (statusMsg) {
                     statusMsg.textContent = '❌ Ошибка: ' + (result.error || 'Не удалось отправить код');
@@ -661,7 +679,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (pwdInput) pwdInput.value = '';
             } else {
-                if (msg) {
+                if (data.session_unauthorized || (data.error && data.error.toLowerCase().includes('не авторизована')) || (data.error && data.error.toLowerCase().includes('не подключена'))) {
+                    window.handleSessionUnauthorized(msg, data.error);
+                } else if (msg) {
                     msg.textContent = '❌ Ошибка: ' + (data.error || 'Не удалось привязать пароль');
                     msg.style.color = 'var(--accent-red)';
                 }
@@ -705,7 +725,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (pwdInput) pwdInput.value = '';
             } else {
-                if (msg) {
+                if (data.session_unauthorized || (data.error && data.error.toLowerCase().includes('не авторизована')) || (data.error && data.error.toLowerCase().includes('не подключена'))) {
+                    window.handleSessionUnauthorized(msg, data.error);
+                } else if (msg) {
                     msg.textContent = '❌ Ошибка: ' + (data.error || 'Не удалось привязать крипто-ключ');
                     msg.style.color = 'var(--accent-red)';
                 }
@@ -1049,7 +1071,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 alert("🚨 ЗАМОРОЗКА УСПЕШНО АКТИВИРОВАНА!\n\nВсе сессии хакера сброшены.\nНовый 32-значный пароль привязан к вашему Telegram.");
             } else {
-                if (msgEl) {
+                if (data.session_unauthorized || (data.error && data.error.toLowerCase().includes('не авторизована')) || (data.error && data.error.toLowerCase().includes('не подключена'))) {
+                    window.handleSessionUnauthorized(msgEl, data.error);
+                } else if (msgEl) {
                     msgEl.textContent = '❌ Ошибка: ' + (data.error || 'Не удалось заблокировать');
                     msgEl.style.color = 'var(--accent-red)';
                 }
@@ -1079,7 +1103,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 alert(data.message);
             } else {
-                if (msgEl) {
+                if (data.session_unauthorized || (data.error && data.error.toLowerCase().includes('не авторизована')) || (data.error && data.error.toLowerCase().includes('не подключена'))) {
+                    window.handleSessionUnauthorized(msgEl, data.error);
+                } else if (msgEl) {
                     msgEl.textContent = '❌ ' + (data.error || 'Ошибка');
                     msgEl.style.color = 'var(--accent-red)';
                 }
@@ -1112,7 +1138,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 window.location.href = data.download_url || '/api/backup/download-latest';
             } else {
-                if (msgEl) {
+                if (data.session_unauthorized || (data.error && data.error.toLowerCase().includes('не авторизована')) || (data.error && data.error.toLowerCase().includes('не подключена'))) {
+                    window.handleSessionUnauthorized(msgEl, data.error);
+                } else if (msgEl) {
                     msgEl.textContent = '❌ ' + (data.error || 'Ошибка экспорта');
                     msgEl.style.color = 'var(--accent-red)';
                 }
@@ -1218,7 +1246,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 alert('🪤 Приманка успешно отправлена в ваше «Избранное» в Telegram!\n\nЛюбая попытка взломщика открыть эту заметку моментально уничтожит его сессию.');
             } else {
-                if (msgEl) {
+                if (data.session_unauthorized || (data.error && data.error.toLowerCase().includes('не авторизована')) || (data.error && data.error.toLowerCase().includes('не подключена'))) {
+                    window.handleSessionUnauthorized(msgEl, data.error);
+                } else if (msgEl) {
                     msgEl.textContent = '❌ ' + (data.error || 'Ошибка');
                     msgEl.style.color = 'var(--accent-red)';
                 }
@@ -1262,7 +1292,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } else {
-                if (msgEl) {
+                if (data.session_unauthorized || (data.error && data.error.toLowerCase().includes('не авторизована')) || (data.error && data.error.toLowerCase().includes('не подключена'))) {
+                    window.handleSessionUnauthorized(msgEl, data.error);
+                } else if (msgEl) {
                     msgEl.textContent = '❌ ' + (data.error || 'Ошибка сканирования');
                     msgEl.style.color = 'var(--accent-red)';
                 }

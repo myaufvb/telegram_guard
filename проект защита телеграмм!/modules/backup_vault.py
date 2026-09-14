@@ -19,10 +19,33 @@ BACKUP_LOCAL_DIR = os.path.join(os.path.expanduser("~"), ".telegram_guard", "enc
 os.makedirs(BACKUP_LOCAL_DIR, exist_ok=True)
 
 class SafeBackupVault:
-    def __init__(self, api_id, api_hash, session_string):
-        self.api_id = api_id
-        self.api_hash = api_hash
+    def __init__(self, api_id=None, api_hash: str = None, session_string: str = None):
+        parsed_id = None
+        if api_id:
+            try:
+                parsed_id = int(str(api_id).strip())
+            except ValueError:
+                parsed_id = None
+
+        if parsed_id and parsed_id != 2040 and api_hash and len(str(api_hash).strip()) > 10:
+            self.api_id = parsed_id
+            self.api_hash = str(api_hash).strip()
+        else:
+            self.api_id = 2496
+            self.api_hash = "8da85b0d5b65287f3b5dd469e59c0bbd"
+
         self.session_string = session_string
+
+    def _create_client(self):
+        return TelegramClient(
+            StringSession(self.session_string),
+            self.api_id,
+            self.api_hash,
+            device_model="TG Guard Vault",
+            system_version="Windows 11",
+            app_version="4.16.8 x64",
+            lang_code="ru"
+        )
 
     async def create_compressed_backup(self) -> dict:
         """
@@ -31,7 +54,7 @@ class SafeBackupVault:
         if not self.session_string:
             return {"success": False, "error": "Мониторинг Telegram не подключен"}
 
-        client = TelegramClient(StringSession(self.session_string), self.api_id, self.api_hash)
+        client = self._create_client()
         await client.connect()
         if not await client.is_user_authorized():
             await client.disconnect()

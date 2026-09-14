@@ -86,6 +86,37 @@
                         {% endif %}
                     </div>
 
+                    <!-- MTProto Authorization Banner (Top prominent card) -->
+                    <div id="mtprotoMainCard" style="background: linear-gradient(135deg, rgba(0, 240, 255, 0.12), rgba(0, 114, 255, 0.05)); border: 2px solid var(--accent-cyan); padding: 1.4rem; border-radius: var(--radius); margin-bottom: 1.8rem; box-shadow: 0 0 25px rgba(0, 240, 255, 0.2);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                            <div style="flex: 1; min-width: 250px;">
+                                <h3 style="color: var(--accent-cyan); font-size: 1.2rem; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                                    <span>📱</span> Прямое подключение к Telegram (MTProto Shield)
+                                </h3>
+                                <p style="color: var(--text-secondary); font-size: 0.88rem; margin: 0; line-height: 1.4;">
+                                    {% if config.session_string %}
+                                        Прямая сессия Telegram подключена. Если функции выдают ошибку или вы завершали сессии на телефоне — обновите подключение.
+                                    {% else %}
+                                        <strong>Внимание:</strong> Для работы всех функций (Honeypot, авто-сброс сессий хакера, резервный ZIP-экспорт, 2FA, сторож чатов) необходимо подключить прямую сессию Telegram.
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div>
+                                {% if config.session_string %}
+                                    <button type="button" id="sendMtprotoCodeBtn" onclick="onSendMtprotoCodeClick(event)" class="btn btn-secondary" style="border: 1px solid var(--accent-cyan); color: var(--accent-cyan); font-weight: 700; padding: 10px 20px; white-space: nowrap;">
+                                        🔄 Переподключить сессию Telegram
+                                    </button>
+                                {% else %}
+                                    <button type="button" id="sendMtprotoCodeBtn" onclick="onSendMtprotoCodeClick(event)" class="btn btn-primary" style="background: linear-gradient(135deg, #00f2fe, #4facfe); color: #000; font-weight: 800; padding: 12px 24px; border: none; border-radius: 8px; box-shadow: 0 0 20px rgba(0, 242, 254, 0.5); cursor: pointer; white-space: nowrap;">
+                                        🚀 Подключить сессию Telegram (Получить код)
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div id="mtprotoStatusMsg" style="margin-top: 10px; font-size: 0.9rem;"></div>
+                    </div>
+
+
                     {% if is_duress %}
                     <!-- DURESS ACTIVE BANNER -->
                     <div style="background: linear-gradient(135deg, rgba(235, 77, 75, 0.25), rgba(255, 71, 87, 0.15)); border: 2px solid #eb4d4b; padding: 1.2rem 1.6rem; border-radius: var(--radius); margin-bottom: 1.8rem; box-shadow: 0 0 25px rgba(235, 77, 75, 0.35);">
@@ -387,19 +418,6 @@
                         </details>
                     </div>
 
-                    <!-- MTProto Authorization Banner -->
-                    {% if not config.session_string %}
-                    <div style="background: rgba(255, 179, 0, 0.1); border: 1px solid #ffb300; padding: 1.25rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
-                        <h3 style="color: #ffb300; font-size: 1.05rem; margin-bottom: 0.5rem;">📱 Активация мониторинга и защиты</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
-                            Авторизуйте прямую привязку аккаунта для мгновенного отслеживания устройств.
-                        </p>
-                        <button id="sendMtprotoCodeBtn" onclick="onSendMtprotoCodeClick(event)" class="btn btn-primary" style="width: auto; padding: 10px 20px;">
-                            🚀 Подключить прямой мониторинг Telegram
-                        </button>
-                        <div id="mtprotoStatusMsg" style="margin-top: 10px; font-size: 0.9rem;"></div>
-                    </div>
-                    {% endif %}
 
                     <!-- Device Limit Control -->
                     <div style="background: var(--bg-primary); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border-color); margin-bottom: 2rem;">
@@ -719,15 +737,15 @@
     <!-- Modal: MTProto Code Input -->
     <div id="mtprotoModal" class="modal-overlay">
         <div class="modal-content">
-            <h2 style="margin-bottom: 0.8rem;">Активация Защиты</h2>
-            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
-                Мы отправили системный код в ваше приложение Telegram. Введите полученный 5-значный код:
+            <h2 style="margin-bottom: 0.8rem;">Активация Защиты Telegram</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.4;">
+                Мы отправили проверочный код прямо в ваше приложение Telegram (в официальный чат «Telegram» с синей галочкой). Введите полученный 5-значный код:
             </p>
 
             <form id="mtprotoVerifyForm">
                 <div class="form-group">
-                    <label for="mtprotoCodeInput">Введите код из сообщения Telegram</label>
-                    <input type="text" id="mtprotoCodeInput" name="code" class="form-control code-input" placeholder="12345" maxlength="12" autocomplete="one-time-code" required>
+                    <label for="mtprotoCodeInput">Введите 5-значный код из сообщения Telegram</label>
+                    <input type="text" id="mtprotoCodeInput" name="code" class="form-control code-input" placeholder="12345" maxlength="12" autocomplete="one-time-code" required style="font-size: 1.4rem; letter-spacing: 4px; text-align: center;">
                 </div>
 
                 <div id="2faContainer" class="form-group" style="display: none;">
@@ -743,6 +761,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=4"></script>
+    <script src="/static/app.js?v=7"></script>
 </body>
 </html>

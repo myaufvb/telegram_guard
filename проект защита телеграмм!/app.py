@@ -133,14 +133,23 @@ async def dashboard_page(request: Request, user: User = Depends(get_current_user
         db.commit()
         db.refresh(config)
 
-    # If MTProto session is connected, fetch real live sessions safely!
+    # If MTProto session is connected, verify authorization and fetch real live sessions safely!
     real_sessions = []
     if config.session_string and not is_duress:
         try:
             watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
-            real_sessions = await watchdog.get_active_sessions()
+            client = watchdog._create_client()
+            await client.connect()
+            is_auth = await client.is_user_authorized()
+            await client.disconnect()
+            if is_auth:
+                real_sessions = await watchdog.get_active_sessions()
+            else:
+                logging.warning(f"Session for user {user.id} ({user.phone_number}) is no longer authorized. Resetting session_string.")
+                config.session_string = None
+                db.commit()
         except Exception as e:
-            logging.error(f"Error fetching sessions for dashboard: {e}")
+            logging.error(f"Error checking sessions for dashboard: {e}")
 
     # Developer Panel Data (Only for developer: ID 1 or +998334906969)
     all_users = []
@@ -591,9 +600,8 @@ async def generate_otp(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите прямой мониторинг Telegram на сайте (кнопка ниже)"})
+        return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не подключена. Нажмите «Подключить сессию Telegram» вверху страницы."})
 
     # Generate a sleek 8-character random OTP password
     rand_chars = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -605,6 +613,10 @@ async def generate_otp(
 
     if not res.get("success"):
         err_msg = res.get("error", "")
+        if "не авторизована" in err_msg.lower():
+            config.session_string = None
+            db.commit()
+            return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не авторизована или устарела. Нажмите «Подключить сессию Telegram» вверху страницы."})
         if "password" in err_msg.lower():
             err_msg = "Неверный текущий пароль Telegram. Укажите правильный текущий пароль."
         return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
@@ -646,7 +658,7 @@ async def update_custom_2fa_password(
 
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите прямой мониторинг Telegram на сайте"})
+        return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не подключена. Нажмите «Подключить сессию Telegram» вверху страницы."})
 
     if not new_password or len(new_password.strip()) < 4:
         return JSONResponse(status_code=400, content={"success": False, "error": "Пароль должен содержать минимум 4 символа"})
@@ -656,7 +668,12 @@ async def update_custom_2fa_password(
     res = await watchdog.update_2fa_password(new_password=new_password.strip(), current_password=curr_pwd)
 
     if not res.get("success"):
-        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error")})
+        err_msg = res.get("error", "")
+        if "не авторизована" in err_msg.lower():
+            config.session_string = None
+            db.commit()
+            return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не авторизована или устарела. Нажмите «Подключить сессию Telegram» вверху страницы."})
+        return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
 
     config.current_2fa_otp = new_password.strip()
     db.commit()
@@ -678,7 +695,7 @@ async def generate_crypto_32(
 
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Сначала подключите мониторинг Telegram выше"})
+        return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не подключена. Нажмите «Подключить сессию Telegram» вверху страницы."})
 
     import secrets
     alphabet = string.ascii_letters + string.digits + "!@#$%&*-_=+"
@@ -690,6 +707,10 @@ async def generate_crypto_32(
 
     if not res.get("success"):
         err_msg = res.get("error", "")
+        if "не авторизована" in err_msg.lower():
+            config.session_string = None
+            db.commit()
+            return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не авторизована или устарела. Нажмите «Подключить сессию Telegram» вверху страницы."})
         if "password" in err_msg.lower():
             err_msg = "Неверный текущий пароль Telegram. Укажите текущий пароль в поле ниже."
         return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
@@ -751,7 +772,7 @@ async def panic_lockdown(
 
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен на сайте"})
+        return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не подключена. Нажмите «Подключить сессию Telegram» вверху страницы."})
 
     import secrets
     alphabet = string.ascii_letters + string.digits + "!@#$%&*-_=+"
@@ -759,6 +780,14 @@ async def panic_lockdown(
 
     watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
     res = await watchdog.panic_lockdown_execute(new_crypto_password=panic_crypto_pwd)
+
+    if not res.get("success"):
+        err = str(res.get("error", ""))
+        if "не авторизована" in err.lower():
+            config.session_string = None
+            db.commit()
+            return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не авторизована или устарела. Нажмите «Подключить сессию Telegram» вверху страницы."})
+        return JSONResponse(status_code=400, content={"success": False, "error": err})
 
     config.current_2fa_otp = panic_crypto_pwd
     config.device_limit = 1
@@ -788,7 +817,7 @@ async def create_honeypot(
 
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен на сайте"})
+        return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не подключена. Нажмите «Подключить сессию Telegram» вверху страницы."})
 
     watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
     res = await watchdog.create_honeypot_trap()
@@ -798,7 +827,12 @@ async def create_honeypot(
         db.commit()
         return {"success": True, "message": "🪤 Ловушка-приманка успешно создана в вашем Telegram! Любое действие хакера в этом чате вызовет мгновенную ликвидацию сессии."}
     else:
-        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error", "Ошибка создания ловушки")})
+        err = str(res.get("error", "Ошибка создания ловушки"))
+        if "не авторизована" in err.lower():
+            config.session_string = None
+            db.commit()
+            return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не авторизована или устарела. Нажмите «Подключить сессию Telegram» вверху страницы."})
+        return JSONResponse(status_code=400, content={"success": False, "error": err})
 
 @app.post("/api/security/set-duress-password")
 async def set_duress_password(
@@ -827,14 +861,19 @@ async def export_backup_archive(
 
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен на сайте"})
+        return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не подключена. Нажмите «Подключить сессию Telegram» вверху страницы."})
 
     from modules.backup_vault import SafeBackupVault
     vault = SafeBackupVault(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
     res = await vault.create_compressed_backup()
 
     if not res.get("success"):
-        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error", "Ошибка архивации")})
+        err = str(res.get("error", "Ошибка архивации"))
+        if "не авторизована" in err.lower():
+            config.session_string = None
+            db.commit()
+            return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не авторизована или устарела. Нажмите «Подключить сессию Telegram» вверху страницы."})
+        return JSONResponse(status_code=400, content={"success": False, "error": err})
 
     return {
         "success": True,
@@ -1168,7 +1207,7 @@ async def honeytoken_triggered(token: str = None, request: Request = None, db: S
 async def plant_honeytoken_api(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен"})
+        return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не подключена. Нажмите «Подключить сессию Telegram» вверху страницы."})
 
     import secrets
     secret_token = secrets.token_hex(16)
@@ -1183,7 +1222,12 @@ async def plant_honeytoken_api(request: Request, user: User = Depends(get_curren
     if res.get("success"):
         return {"success": True, "message": "🪤 Ловушка-Honeytoken успешно отправлена в «Избранное» (Saved Messages)!"}
     else:
-        return JSONResponse(status_code=400, content={"success": False, "error": res.get("error")})
+        err = str(res.get("error", "Ошибка установки приманки"))
+        if "не авторизована" in err.lower():
+            config.session_string = None
+            db.commit()
+            return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не авторизована или устарела. Нажмите «Подключить сессию Telegram» вверху страницы."})
+        return JSONResponse(status_code=400, content={"success": False, "error": err})
 
 # 2. ZERO-TRUST WEB & QR-LOGIN BLOCKER
 @app.post("/api/security/toggle-web-block")
@@ -1274,10 +1318,16 @@ async def trigger_sms_kill_switch(
 async def scan_profile_clones_api(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     config = db.query(TelegramProtectionConfig).filter(TelegramProtectionConfig.user_id == user.id).first()
     if not config or not config.session_string:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Мониторинг Telegram не подключен"})
+        return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не подключена. Нажмите «Подключить сессию Telegram» вверху страницы."})
 
     watchdog = SessionWatchdog(api_id=config.api_id, api_hash=config.api_hash, session_string=config.session_string)
     res = await watchdog.scan_fake_clones()
+    if not res.get("success"):
+        err = str(res.get("error", ""))
+        if "не авторизована" in err.lower():
+            config.session_string = None
+            db.commit()
+            return JSONResponse(status_code=400, content={"success": False, "session_unauthorized": True, "error": "Сессия Telegram не авторизована или устарела. Нажмите «Подключить сессию Telegram» вверху страницы."})
     return res
 
 # 5. WEBAUTHN / PASSKEY / BIOMETRIC AUTH
