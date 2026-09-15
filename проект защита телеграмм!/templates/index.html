@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Telegram Guard — Система защиты аккаунта</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+                if (typeof window.Telegram.WebApp.enableClosingConfirmation === 'function') {
+                    window.Telegram.WebApp.enableClosingConfirmation();
+                }
+            }
+        } catch(e) { console.error('Telegram WebApp init error', e); }
+    </script>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>

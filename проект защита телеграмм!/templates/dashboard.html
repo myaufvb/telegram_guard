@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Панель управления — Telegram Guard</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+                if (typeof window.Telegram.WebApp.enableClosingConfirmation === 'function') {
+                    window.Telegram.WebApp.enableClosingConfirmation();
+                }
+            }
+        } catch(e) { console.error('Telegram WebApp init error', e); }
+    </script>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -196,9 +207,6 @@
                         <div id="geofenceStatusMsg" style="margin-top: 10px; font-size: 0.88rem;"></div>
                     </div>
 
-                    <!-- Dynamic 2FA Cloud Password Card -->
-                    <div style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(79, 172, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.12);">
-
                     <!-- ANTI-SPAM SENTINEL & HONEYPOT CARD -->
                     <div style="background: linear-gradient(135deg, rgba(255, 159, 67, 0.08), rgba(254, 202, 87, 0.04)); border: 1px solid #ff9f43; padding: 1.4rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 25px rgba(255, 159, 67, 0.1);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
@@ -351,6 +359,9 @@
                         </div>
                         <div id="clonesResultsBox" style="margin-top: 15px; display: none;"></div>
                     </div>
+
+                    <!-- Dynamic 2FA Cloud Password Card -->
+                    <div style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(79, 172, 254, 0.04)); border: 1px solid var(--accent-cyan); padding: 1.6rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: 0 8px 30px rgba(0, 242, 254, 0.12);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
                             <h3 style="font-size: 1.15rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
                                 <span>🔑</span> Динамический Облачный Пароль (2FA Telegram)
@@ -592,8 +603,12 @@
                         <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 0.8rem; line-height: 1.5;">
                             Привяжите отпечаток пальца, сканер лица или аппаратный ключ YubiKey. Вы сможете входить в личный кабинет в 1 касание без ввода пароля, а вирусы-кейлоггеры никогда не смогут перехватить доступ!
                         </p>
-                        <div style="background: rgba(30, 144, 255, 0.1); border-left: 3px solid #1e90ff; padding: 10px 14px; border-radius: 6px; font-size: 0.84rem; color: #a4b0be; margin-bottom: 1.2rem; line-height: 1.4;">
-                            💡 <strong>Как привязать на обычном ПК:</strong> Нажмите кнопку ниже. В открывшемся системном окне выберите <em>«Использовать телефон или планшет»</em> — на экране появится QR-код. Отсканируйте его камерой смартфона (iPhone Face ID или Android отпечаток), и доступ будет мгновенно привязан! Либо используйте ПИН-код Windows Hello / USB-ключ. На смартфоне Face ID срабатывает автоматически.
+                        <div style="background: rgba(30, 144, 255, 0.1); border-left: 3px solid #1e90ff; padding: 12px 16px; border-radius: 6px; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 1.2rem; line-height: 1.5;">
+                            💡 <strong>Инструкция по привязке биометрии (Face ID / Passkey):</strong><br>
+                            • <strong>На телефоне (Android / iPhone):</strong> Откройте сайт в обычном браузере (Chrome / Safari) и нажмите кнопку ниже — сканер лица/пальца сработает сразу на вашем телефоне.<br>
+                            • <strong>В приложении Telegram (Mini App):</strong> Встроенный браузер Telegram блокирует Passkey из соображений безопасности. Откройте сайт в Chrome или Safari для регистрации.<br>
+                            • <strong>Через QR-код с компьютера на Android:</strong> Сканируйте QR-код <strong>стандартной камерой с Google Объективом (Google Lens)</strong> или кнопкой «Сканер QR» в шторке уведомлений Android. Сторонние сканеры из Play Store просто копируют текст <code>FIDO:/...</code> вместо вызова сканера лица.<br>
+                            • <strong>На iPhone с компьютера:</strong> Сканируйте QR-код стандартной камерой iOS — появится кнопка «Сохранить ключ доступа».
                         </div>
                         <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                             <button type="button" onclick="registerWebAuthnBiometrics()" class="btn" style="background: linear-gradient(135deg, #2ed573, #1e90ff); color: #fff; font-weight: 700; padding: 12px 22px; border: none; border-radius: 8px; box-shadow: 0 0 15px rgba(46, 213, 115, 0.4); cursor: pointer;">

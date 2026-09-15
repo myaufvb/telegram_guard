@@ -1407,8 +1407,12 @@ async def webauthn_register_options(request: Request, user: User = Depends(get_c
             "displayName": user.username
         },
         "pubKeyCredParams": [
-            {"alg": -7, "type": "public-key"},
-            {"alg": -257, "type": "public-key"}
+            {"alg": -7, "type": "public-key"},   # ES256 (NIST P-256)
+            {"alg": -257, "type": "public-key"}, # RS256 (RSA 2048)
+            {"alg": -8, "type": "public-key"},   # EdDSA / Ed25519
+            {"alg": -37, "type": "public-key"},  # PS256
+            {"alg": -35, "type": "public-key"},  # ES384
+            {"alg": -36, "type": "public-key"}   # ES512
         ]
     }
 

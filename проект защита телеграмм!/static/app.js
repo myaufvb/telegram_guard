@@ -1385,12 +1385,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Helper to open website in external system browser from Telegram Mini App
+    window.openInExternalBrowser = function() {
+        const url = window.location.href;
+        if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openLink === 'function') {
+            window.Telegram.WebApp.openLink(url, { try_instant_view: false });
+        } else {
+            window.open(url, '_blank');
+        }
+    };
+
     // 5. WebAuthn Biometrics / Passkey Registration
     window.registerWebAuthnBiometrics = async function() {
         const msgEl = document.getElementById('webauthnRegStatusMsg');
         if (msgEl) {
             msgEl.textContent = '⏳ Инициализация сканера биометрии (Face ID / Touch ID / Телефон / Ключ)...';
             msgEl.style.color = 'var(--text-secondary)';
+        }
+
+        // Проверяем, запущено ли внутри Telegram Mini App (WebView)
+        const isTgMiniApp = Boolean(
+            (window.Telegram && window.Telegram.WebApp && (window.Telegram.WebApp.initData || window.Telegram.WebApp.platform)) ||
+            navigator.userAgent.includes('Telegram')
+        );
+
+        if (isTgMiniApp) {
+            const openNow = confirm(
+                '⚠️ Внимание:\n\n' +
+                'Встроенный браузер Telegram блокирует Face ID / Passkey по правилам безопасности Telegram.\n\n' +
+                'Открыть Telegram Guard в обычном браузере (Chrome / Safari), чтобы привязать биометрию в 1 касание?'
+            );
+            if (openNow) {
+                window.openInExternalBrowser();
+            }
+            if (msgEl) {
+                msgEl.innerHTML = '⚠️ <strong>В Telegram биометрия заблокирована:</strong> <a href="javascript:void(0)" onclick="openInExternalBrowser()" style="color:var(--accent-cyan);font-weight:700;text-decoration:underline;">Нажмите здесь, чтобы открыть в обычном браузере (Chrome / Safari)</a>';
+                msgEl.style.color = '#ffd700';
+            }
+            return;
         }
 
         try {
@@ -1409,32 +1441,82 @@ document.addEventListener('DOMContentLoaded', () => {
                 c => c.charCodeAt(0)
             );
 
+            // Формируем корректный Relying Party ID на основе текущего хоста браузера
+            const currentHost = window.location.hostname;
+            const rp = { name: "Telegram Guard" };
+            if (currentHost && currentHost !== 'localhost' && !/^[0-9.]+$/.test(currentHost)) {
+                rp.id = currentHost;
+            }
+
+            const pubKeyCredParams = optData.pubKeyCredParams || [
+                { alg: -7, type: 'public-key' },
+                { alg: -257, type: 'public-key' },
+                { alg: -8, type: 'public-key' },
+                { alg: -37, type: 'public-key' }
+            ];
+
             let cred = null;
             try {
+                // Попытка 1: со стандартными параметрами Passkey
                 cred = await navigator.credentials.create({
                     publicKey: {
                         challenge: challenge,
-                        rp: optData.rp,
+                        rp: rp,
                         user: {
                             id: new TextEncoder().encode(String(optData.user.id)),
                             name: optData.user.name,
                             displayName: optData.user.displayName
                         },
-                        pubKeyCredParams: optData.pubKeyCredParams,
+                        pubKeyCredParams: pubKeyCredParams,
                         authenticatorSelection: {
                             userVerification: 'preferred',
-                            residentKey: 'preferred'
+                            residentKey: 'preferred',
+                            requireResidentKey: false
                         },
                         timeout: 60000
                     }
                 });
-            } catch (webauthnErr) {
-                console.warn('WebAuthn registration cancelled or failed:', webauthnErr);
-                if (msgEl) {
-                    msgEl.textContent = '❌ Регистрация биометрии отменена пользователем.';
-                    msgEl.style.color = 'var(--accent-red)';
+            } catch (firstErr) {
+                console.warn('Initial WebAuthn create failed, trying fallback options:', firstErr);
+                if (firstErr.name === 'NotAllowedError') {
+                    if (msgEl) {
+                        msgEl.textContent = '❌ Регистрация биометрии отменена пользователем.';
+                        msgEl.style.color = 'var(--accent-red)';
+                    }
+                    return;
                 }
-                return; // СТРОГО СТОП! Если нажали «Отмена», ничего не регистрируем!
+                // Попытка 2: упрощенные параметры для Android / внешних ключей
+                try {
+                    cred = await navigator.credentials.create({
+                        publicKey: {
+                            challenge: challenge,
+                            rp: rp,
+                            user: {
+                                id: new TextEncoder().encode(String(optData.user.id)),
+                                name: optData.user.name,
+                                displayName: optData.user.displayName
+                            },
+                            pubKeyCredParams: [
+                                { alg: -7, type: 'public-key' },
+                                { alg: -257, type: 'public-key' }
+                            ],
+                            authenticatorSelection: {
+                                userVerification: 'preferred'
+                            },
+                            timeout: 60000
+                        }
+                    });
+                } catch (secondErr) {
+                    console.warn('Fallback WebAuthn create also failed:', secondErr);
+                    if (secondErr.name === 'NotAllowedError') {
+                        if (msgEl) {
+                            msgEl.textContent = '❌ Регистрация биометрии отменена пользователем.';
+                            msgEl.style.color = 'var(--accent-red)';
+                        }
+                        return;
+                    }
+                    throw secondErr;
+                }
             }
 
             if (!cred || !cred.id) {
@@ -1468,7 +1550,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             if (msgEl) {
-                msgEl.textContent = '❌ ' + err.message;
+                msgEl.textContent = '❌ ' + (err.message || 'Ошибка регистрации биометрии');
                 msgEl.style.color = 'var(--accent-red)';
             }
         }
@@ -1480,6 +1562,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedCredId = localStorage.getItem('tg_guard_webauthn_id');
         if (!savedCredId) {
             alert('Сначала привяжите биометрию в личном кабинете или войдите по паролю / коду из бота!');
+            return;
+        }
+
+        // Проверяем Telegram Mini App
+        const isTgMiniApp = Boolean(
+            (window.Telegram && window.Telegram.WebApp && (window.Telegram.WebApp.initData || window.Telegram.WebApp.platform)) ||
+            navigator.userAgent.includes('Telegram')
+        );
+
+        if (isTgMiniApp) {
+            const openNow = confirm(
+                '⚠️ Внимание:\n\n' +
+                'Вход по биометрии (Face ID / Passkey) заблокирован встроенным браузером Telegram.\n\n' +
+                'Открыть сайт в обычном браузере (Chrome / Safari) для входа по биометрии?'
+            );
+            if (openNow) {
+                window.openInExternalBrowser();
+            }
+            if (alertEl) {
+                alertEl.style.display = 'block';
+                alertEl.innerHTML = '⚠️ Вход по Face ID доступен в обычном браузере (Chrome / Safari). <a href="javascript:void(0)" onclick="openInExternalBrowser()" style="color:var(--accent-cyan);font-weight:700;text-decoration:underline;">Открыть в браузере</a>';
+                alertEl.style.color = '#ffd700';
+            }
             return;
         }
 
@@ -1510,8 +1615,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 timeout: 60000,
                 userVerification: 'preferred'
             };
-            if (optData.rpId) {
-                getOptions.rpId = optData.rpId;
+
+            const currentHost = window.location.hostname;
+            if (currentHost && currentHost !== 'localhost' && !/^[0-9.]+$/.test(currentHost)) {
+                getOptions.rpId = currentHost;
+            }
+
+            if (savedCredId) {
+                try {
+                    const rawId = Uint8Array.from(atob(savedCredId.replace(/-/g, '+').replace(/_/g, '/').padEnd(savedCredId.length + (4 - savedCredId.length % 4) % 4, '=')), c => c.charCodeAt(0));
+                    getOptions.allowCredentials = [{
+                        id: rawId,
+                        type: 'public-key'
+                    }];
+                } catch (parseErr) {
+                    console.warn('Could not parse saved credId, continuing with discoverable creds');
+                }
             }
 
             // Вызываем системное окно подтверждения биометрии (Face ID / Touch ID / PIN)
