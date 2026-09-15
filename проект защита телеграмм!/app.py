@@ -136,6 +136,14 @@ async def index_page(request: Request, user: User = Depends(get_current_user)):
         return RedirectResponse(url=f"/dashboard?uid={user.id}", status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(request=request, name="index.html")
 
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_page(request: Request):
+    return templates.TemplateResponse(request=request, name="terms.html")
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    return templates.TemplateResponse(request=request, name="privacy.html")
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not user:

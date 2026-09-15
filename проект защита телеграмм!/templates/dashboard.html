@@ -661,6 +661,16 @@
                             </span>
                         </div>
                     </div>
+
+                    <!-- Legal Documents Card -->
+                    <div style="margin-top: 1.5rem; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 1.2rem 1.6rem; border-radius: var(--radius);">
+                        <h4 style="font-size: 0.95rem; margin-bottom: 0.6rem; color: var(--text-primary);">📄 Юридическая информация и безопасность</h4>
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; font-size: 0.88rem;">
+                            <a href="/terms" target="_blank" style="color: var(--accent-cyan); text-decoration: underline;">Пользовательское соглашение</a>
+                            <span style="color: var(--border-color);">|</span>
+                            <a href="/privacy" target="_blank" style="color: var(--accent-cyan); text-decoration: underline;">Политика конфиденциальности</a>
+                        </div>
+                    </div>
                 </div>
 
                 {% if user.id == 1 or user.is_developer %}
